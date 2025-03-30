@@ -1,3 +1,4 @@
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
@@ -11,11 +12,12 @@ async fn bootstrap() -> anyhow::Result<()> {
     use axum::routing;
     use std::net::Ipv4Addr;
     use tokio::net::TcpListener;
-    use tower::ServiceBuilder;
+    use tower_http::trace::TraceLayer;
+
 
     let router = axum::Router::new()
         .route("/", routing::get(handler))
-        .layer(ServiceBuilder::new());
+        .layer(TraceLayer::new_for_http());
 
     let addr = std::net::SocketAddr::from((Ipv4Addr::UNSPECIFIED, 3000));
     let listener = TcpListener::bind(addr).await?;
