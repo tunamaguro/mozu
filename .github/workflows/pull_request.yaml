@@ -35,7 +35,8 @@ jobs:
       - name: Install Rust
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
-          components: rustfmt,just
+          components: rustfmt
+          bins: just
           cache-base: main
       - name: Run format
         run: |
@@ -49,7 +50,8 @@ jobs:
       - name: Install Rust
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
-          components: clippy,just
+          components: clippy
+          bins: just
           cache-base: main
       - name: Run lint
         env:
@@ -68,7 +70,7 @@ jobs:
       - name: Install Rust
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
-          components: just
+          bins: just
           cache-base: main
       - name: Run test
         run: |
