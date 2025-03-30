@@ -51,11 +51,12 @@ jobs:
         with:
           components: clippy
           cache-base: main
-      - name: Run lint
+      - name: Run lint(debug)
         run: |
             RUSTFLAGS="--deny warnings" cargo clippy --workspace --all-targets --all-features
+      - name: Run lint(release)
         run: |
-            RUSTFLAGS="--deny warnings" cargo clippy --workspace --all-targets --all-features --release
+            RUSTFLAGS="--deny warnings" cargo clippy --workspace --all-targets --all-features --release            
   test:
     name: Test on ${{matrix.os}}
     runs-on: ${{matrix.os}}
