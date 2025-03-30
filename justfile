@@ -25,7 +25,4 @@ lint-ci:
 test:
     cargo test --all-features --workspace
 
-ready:
-    just format
-    just lint-ci
-    just test
+ready: format lint-ci test
