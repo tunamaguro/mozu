@@ -1,4 +1,3 @@
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
@@ -13,7 +12,6 @@ async fn bootstrap() -> anyhow::Result<()> {
     use std::net::Ipv4Addr;
     use tokio::net::TcpListener;
     use tower_http::trace::TraceLayer;
-
 
     let router = axum::Router::new()
         .route("/", routing::get(handler))
