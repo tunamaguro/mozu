@@ -1,4 +1,5 @@
 pub mod account;
+pub mod hosturl;
 
 use std::{ops::Deref, str::FromStr};
 

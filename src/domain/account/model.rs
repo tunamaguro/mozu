@@ -1,9 +1,11 @@
-use crate::model::Id;
+use crate::domain::Id;
 use std::sync::LazyLock;
+
+pub type AccountId = Id<Account>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Account {
-    id: Id<Account>,
+    id: AccountId,
     name: AccountName,
 }
 
@@ -39,6 +41,10 @@ impl AccountName {
         }
 
         Ok(Self(raw.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
