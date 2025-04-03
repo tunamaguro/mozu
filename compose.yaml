@@ -1,0 +1,15 @@
+services:
+  dev:
+    build:
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace:cached
+    working_dir: /workspace
+    command: sleep infinity
+  
+  postgres:
+    image: postgres:17.4-bookworm
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydb
