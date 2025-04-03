@@ -39,14 +39,17 @@ migrate NAME:
     migrate create -ext sql -dir src/infrastructure/migrations -seq {{NAME}}
 
 migrate_db_up:
-    migrate -database ${DATABASE_URL} -path src/infrastructure/migrations up
+    migrate -database ${DATABASE_URL} -path src/infrastructure/postgres/migrations up
 
 migrate_db_down:
-    migrate -database ${DATABASE_URL} -path src/infrastructure/migrations down
+    migrate -database ${DATABASE_URL} -path src/infrastructure/postgres/migrations down
 
 reset_db: migrate_db_down migrate_db_up
 
 # install tools
 install:
     cargo install cargo-binstall 
-    cargo binstall sqruff
+    cargo binstall sqruff bacon
+
+dev:
+    bacon run-long

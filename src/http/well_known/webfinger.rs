@@ -64,6 +64,7 @@ impl IntoResponse for ApiError {
 impl From<FindAccountError> for ApiError {
     fn from(err: FindAccountError) -> Self {
         match err {
+            FindAccountError::InvalidName(_) => ApiError::BadRequest("invalid name".into()),
             FindAccountError::Unknown(_) => ApiError::InternalServerError,
         }
     }

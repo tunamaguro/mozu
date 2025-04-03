@@ -1,11 +1,16 @@
-use super::adapter::{AccountRepository, AccountService};
+use super::{
+    adapter::{AccountRepository, AccountService},
+    model::{
+        Account, AccountId, AccountName, CreateAccountError, CreateAccountRequest, FindAccountError,
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct Service<R> {
     repo: R,
 }
 
-impl <R> Service<R>
+impl<R> Service<R>
 where
     R: AccountRepository,
 {
@@ -19,15 +24,18 @@ impl<R> AccountService for Service<R>
 where
     R: AccountRepository,
 {
-    async fn create(&self, req: &super::model::CreateAccountRequest) -> Result<super::model::Account, super::model::CreateAccountError> {
-        self.repo.create(req).await
+    async fn create(&self, req: CreateAccountRequest) -> Result<Account, CreateAccountError> {
+        let CreateAccountRequest { name } = req;
+        let account = Account::new(name);
+        let created_account = self.repo.create(account).await?;
+        Ok(created_account)
     }
-
-    async fn find_by_id(&self, id: &uuid::Uuid) -> Result<Option<super::model::Account>, super::model::FindAccountError> {
-        self.repo.find_by_id(id).await
+    async fn find_by_id(&self, id: &AccountId) -> Result<Option<Account>, FindAccountError> {
+        let account = self.repo.find_by_id(id).await?;
+        Ok(account)
     }
-
-    async fn find_by_name(&self, name: &super::model::AccountName) -> Result<Option<super::model::Account>, super::model::FindAccountError> {
-        self.repo.find_by_name(name).await
+    async fn find_by_name(&self, name: &AccountName) -> Result<Option<Account>, FindAccountError> {
+        let account = self.repo.find_by_name(name).await?;
+        Ok(account)
     }
 }

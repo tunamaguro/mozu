@@ -10,11 +10,16 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(id: Id<Account>, name: AccountName) -> Self {
+    pub fn new(name: AccountName) -> Self {
+        let id = AccountId::new();
         Self { id, name }
     }
 
-    pub fn id(&self) -> &Id<Account> {
+    pub fn from_id_name(id: AccountId, name: AccountName) -> Self {
+        Self { id, name }
+    }
+
+    pub fn id(&self) -> &AccountId {
         &self.id
     }
     pub fn name(&self) -> &AccountName {
@@ -49,23 +54,19 @@ impl AccountName {
 }
 
 pub struct CreateAccountRequest {
-    name: AccountName,
+    pub name: AccountName,
 }
 
 impl CreateAccountRequest {
     pub fn new(name: AccountName) -> Self {
         Self { name }
     }
-
-    pub fn name(&self) -> &AccountName {
-        &self.name
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateAccountError {
-    #[error("account name is invalid")]
-    InvalidName(AccountNameError),
+    #[error("{0} is invalid")]
+    InvalidName(String),
     #[error("account already exists")]
     AlreadyExists,
     #[error(transparent)]
@@ -74,6 +75,16 @@ pub enum CreateAccountError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum FindAccountError {
+    #[error("{0} is invalid")]
+    InvalidName(String),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+}
+
+impl From<AccountNameError> for FindAccountError {
+    fn from(e: AccountNameError) -> Self {
+        match e {
+            AccountNameError::InvalidName(name) => FindAccountError::InvalidName(name),
+        }
+    }
 }

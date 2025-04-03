@@ -11,15 +11,15 @@
     ],
     "sql": [
         {
-            "schema": "src/infrastructure/migrations",
-            "queries": "src/infrastructure/queries",
+            "schema": "src/infrastructure/postgres/migrations",
+            "queries": "src/infrastructure/postgres/queries",
             "engine": "postgresql",
             "codegen": [
                 {
-                    "out": "src/infrastructure",
+                    "out": "src/infrastructure/postgres",
                     "plugin": "rust-postgres",
                     "options": {
-                        "db_crate": "tokio_postgres",
+                        "db_crate": "deadpool_postgres",
                         "enum_derives": [
                             "PartialEq"
                         ],

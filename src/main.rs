@@ -1,27 +1,22 @@
+use mozu::{HttpServer, HttpServerConfig, Postgres};
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    bootstrap().await?;
+    tracing::info!("Connect postgres...");
+    let postgres_url = std::env::var("DATABASE_URL")?;
+    let pg = Postgres::new(&postgres_url).await?;
+    tracing::info!("Connected to postgres");
 
-    Ok(())
-}
-
-async fn bootstrap() -> anyhow::Result<()> {
-    use axum::routing;
-    use std::net::Ipv4Addr;
-    use tokio::net::TcpListener;
-    use tower_http::trace::TraceLayer;
-
-    let router = axum::Router::new()
-        .route("/", routing::get(handler))
-        .layer(TraceLayer::new_for_http());
-
-    let addr = std::net::SocketAddr::from((Ipv4Addr::UNSPECIFIED, 3000));
-    let listener = TcpListener::bind(addr).await?;
-
-    tracing::info!("Listening on {}", addr);
-    axum::serve(listener, router).await?;
+    tracing::info!("Starting HTTP server...");
+    let server_config = HttpServerConfig::builder()
+        .host_url("http://localhost:3000".to_string())
+        .port(3000)
+        .build();
+    let server = HttpServer::new(server_config, pg);
+    server.run().await?;
+    tracing::info!("HTTP server stopped");
 
     Ok(())
 }
@@ -35,7 +30,7 @@ fn init_tracing() {
     use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         let level = if cfg!(debug_assertions) {
-            "trace"
+            "debug"
         } else {
             "info"
         };

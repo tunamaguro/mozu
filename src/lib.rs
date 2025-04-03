@@ -1,2 +1,6 @@
-pub mod domain;
-pub mod http;
+mod domain;
+mod http;
+mod infrastructure;
+
+pub use http::{HttpServer, HttpServerConfig};
+pub use infrastructure::postgres::Postgres;
