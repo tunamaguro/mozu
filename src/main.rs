@@ -11,7 +11,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting HTTP server...");
     let server_config = HttpServerConfig::builder()
-        .host_url("http://localhost:3000".to_string())
+        .host_url(std::env::var("HOST_URL")?)
         .port(3000)
         .build();
     let server = HttpServer::new(server_config, pg);
