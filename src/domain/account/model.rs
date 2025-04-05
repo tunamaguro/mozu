@@ -65,8 +65,6 @@ impl CreateAccountRequest {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateAccountError {
-    #[error("{0} is invalid")]
-    InvalidName(String),
     #[error("account already exists")]
     AlreadyExists,
     #[error(transparent)]

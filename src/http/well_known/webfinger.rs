@@ -9,7 +9,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    ap::{WebFinger, WebFingerLink, constants},
+    ap::{WebFinger, WebFingerLink, constants, webfinger::AcctUri},
     domain::account::model::{AccountName, FindAccountError},
     http::state::{AppRegistry, AppRegistryExt},
 };
@@ -64,24 +64,15 @@ impl From<FindAccountError> for ApiError {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WebFingerQuery {
-    resource: String,
+    resource: AcctUri,
 }
 
 impl WebFingerQuery {
     fn try_into_domain(&self, host: &str) -> Result<AccountName, ApiError> {
-        let (_scheme, user_with_domain) = self
-            .resource
-            .split_once("acct:")
-            .ok_or(ApiError::BadRequest(r#"missing "acct:" schema"#.into()))?;
-
-        let (requested_user, requested_host) = user_with_domain
-            .split_once("@")
-            .ok_or(ApiError::BadRequest(r#"missing "@""#.into()))?;
-
-        if requested_host != host {
+        if self.resource.host != host {
             return Err(ApiError::BadRequest(r#"other host"#.into()));
         }
-        let account_name = AccountName::new(requested_user)
+        let account_name = AccountName::new(&self.resource.user)
             .map_err(|e| ApiError::BadRequest(e.to_string().into()))?;
 
         Ok(account_name)

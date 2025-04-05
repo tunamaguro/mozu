@@ -50,9 +50,6 @@ impl From<AccountNameError> for ApiError {
 impl From<CreateAccountError> for ApiError {
     fn from(err: CreateAccountError) -> Self {
         match err {
-            CreateAccountError::InvalidName(name) => {
-                ApiError::BadRequest(format!("Invalid name: {}", name))
-            }
             CreateAccountError::AlreadyExists => ApiError::Conflict,
             CreateAccountError::Unknown(_) => ApiError::InternalServerError,
         }

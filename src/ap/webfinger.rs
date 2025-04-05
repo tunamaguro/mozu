@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{str::FromStr, sync::LazyLock};
 
 use super::constants::{ACTIVITYPUB_MEDIA_TYPE, ACTIVITYPUB_MEDIA_TYPE_ALT};
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,75 @@ impl WebFingerLink {
         } else {
             None
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
+pub enum ParseAcctUriError {
+    #[error("expected `acct:` scheme")]
+    InvalidScheme,
+    #[error("missing `@`")]
+    MissingAt,
+    #[error("invalid user")]
+    MissingUser,
+    #[error("invalid host")]
+    MissingHost,
+}
+
+/// `acct` Uri
+///
+/// See https://datatracker.ietf.org/doc/html/rfc7565
+#[derive(Debug, Clone)]
+pub struct AcctUri {
+    pub user: String,
+    pub host: String,
+}
+
+impl FromStr for AcctUri {
+    type Err = ParseAcctUriError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s
+            .strip_prefix("acct:")
+            .ok_or(ParseAcctUriError::InvalidScheme)?;
+        let s = s.strip_prefix("@").unwrap_or(s);
+
+        let (user, host) = s.split_once('@').ok_or(ParseAcctUriError::MissingAt)?;
+        if user.is_empty() {
+            return Err(ParseAcctUriError::MissingUser);
+        }
+        if host.is_empty() {
+            return Err(ParseAcctUriError::MissingHost);
+        }
+        Ok(Self {
+            user: user.to_string(),
+            host: host.to_string(),
+        })
+    }
+}
+
+impl std::fmt::Display for AcctUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "acct:{}@{}", self.user, self.host)
+    }
+}
+
+impl Serialize for AcctUri {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for AcctUri {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        AcctUri::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 

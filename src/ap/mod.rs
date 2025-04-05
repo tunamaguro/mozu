@@ -1,8 +1,9 @@
 //! ActivityPub module
 use mime;
-mod actor;
-mod webfinger;
 use std::sync::LazyLock;
+
+mod actor;
+pub mod webfinger;
 
 pub use actor::{Actor, ActorType};
 pub use webfinger::{WebFinger, WebFingerLink};
