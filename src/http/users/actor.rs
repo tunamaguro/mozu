@@ -50,6 +50,7 @@ impl From<FindAccountError> for ApiError {
     }
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn actor(
     State(registry): State<AppRegistry>,
     Path(params): Path<Params>,

@@ -16,10 +16,12 @@ pub struct Context<T> {
     /// See https://www.w3.org/TR/activitystreams-core/#jsonld
     #[serde(rename = "@context")]
     pub context: serde_json::Value,
+    #[serde(flatten)]
     pub inner: T,
 }
 
 impl<T> Context<T> {
+    /// Create object with default context
     pub fn new(inner: T) -> Self {
         Self {
             context: serde_json::json!([
@@ -28,6 +30,15 @@ impl<T> Context<T> {
             ]),
             inner,
         }
+    }
+
+    pub fn with_context(context: serde_json::Value, inner: T) -> Self {
+        Self { context, inner }
+    }
+
+    /// split context and inner
+    pub fn split(self) -> (serde_json::Value, T) {
+        (self.context, self.inner)
     }
 }
 
