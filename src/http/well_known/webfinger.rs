@@ -3,29 +3,16 @@ use std::borrow::Cow;
 use axum::{
     Json,
     extract::{Query, State},
-    http::StatusCode,
+    http::{self, StatusCode},
     response::IntoResponse,
 };
 use serde::Serialize;
 
 use crate::{
+    ap::{WebFinger, WebFingerLink, constants},
     domain::account::model::{AccountName, FindAccountError},
     http::state::{AppRegistry, AppRegistryExt},
 };
-
-/// See https://datatracker.ietf.org/doc/html/rfc7033
-#[derive(Debug, Clone, Serialize)]
-pub struct WebFinger {
-    subject: String,
-    links: Vec<WebFingerLink>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct WebFingerLink {
-    rel: String,
-    kind: String,
-    href: String,
-}
 
 pub struct ApiSuccess<T: Serialize> {
     status: StatusCode,
@@ -39,7 +26,12 @@ impl<T: Serialize> ApiSuccess<T> {
 }
 impl<T: Serialize> IntoResponse for ApiSuccess<T> {
     fn into_response(self) -> axum::response::Response {
-        (self.status, Json(self.data)).into_response()
+        (
+            self.status,
+            [(http::header::CONTENT_TYPE, constants::WEBFINGER_MEDIA_TYPE)],
+            Json(self.data),
+        )
+            .into_response()
     }
 }
 
@@ -115,16 +107,18 @@ pub async fn webfinger(
         ));
     };
 
-    let links = vec![WebFingerLink {
-        rel: "self".into(),
-        kind: "application/activity+json".into(),
-        href: host_service.user_url(account.name().as_str()),
-    }];
+    let links = vec![
+        WebFingerLink::builder()
+            .rel("self")
+            .kind("application/activity+json")
+            .href(host_service.user_url(account.name().as_str()))
+            .build(),
+    ];
 
-    let webfinger = WebFinger {
-        subject: format!("acct:{}@{}", account.name().as_str(), host),
-        links,
-    };
+    let webfinger = WebFinger::builder()
+        .subject(format!("acct:{}@{}", account.name().as_str(), host))
+        .links(links)
+        .build();
 
     Ok(ApiSuccess::new(StatusCode::OK, webfinger))
 }

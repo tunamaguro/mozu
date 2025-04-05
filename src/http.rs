@@ -1,4 +1,6 @@
 pub(crate) mod state;
+pub(crate) mod users;
+pub(crate) mod utils;
 pub(crate) mod well_known;
 use state::AppRegistryExt as _;
 use tokio::signal;
@@ -41,6 +43,7 @@ impl HttpServer {
         let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, self.port)).await?;
         let router = axum::Router::new()
             .nest("/.well-known", well_known::router(self.registry.clone()))
+            .nest("/users", users::router(self.registry.clone()))
             .layer(TraceLayer::new_for_http());
 
         tracing::info!("Listening on {}", listener.local_addr()?);

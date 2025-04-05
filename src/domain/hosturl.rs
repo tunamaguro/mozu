@@ -36,6 +36,16 @@ pub trait HostUrlService: Send + Sync + 'static {
 
     /// Return user URL
     fn user_url(&self, user: &str) -> String {
-        format!("{}/{}", self.base_url(), user)
+        format!("{}/users/{}", self.base_url(), user)
+    }
+
+    /// Return user inbox URL
+    fn inbox_url(&self, user: &str) -> String {
+        format!("{}/inbox", self.user_url(user))
+    }
+
+    /// Return user outbox URL
+    fn outbox_url(&self, user: &str) -> String {
+        format!("{}/outbox", self.user_url(user))
     }
 }

@@ -762,6 +762,7 @@ dependencies = [
  "async-trait",
  "axum",
  "deadpool-postgres",
+ "mime",
  "pretty_assertions",
  "regex",
  "rstest",
