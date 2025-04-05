@@ -36,10 +36,11 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           components: rustfmt
+          bins: just,sqruff
           cache-base: main
       - name: Run format
         run: |
-          cargo fmt --all --check
+          just format-ci
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -50,12 +51,13 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           components: clippy
+          bins: just
           cache-base: main
       - name: Run lint
+        env:
+          RUSTFLAGS: "--deny warnings"
         run: |
-            RUSTFLAGS="--deny warnings" cargo clippy --workspace --all-targets --all-features
-        run: |
-            RUSTFLAGS="--deny warnings" cargo clippy --workspace --all-targets --all-features --release
+            just lint-ci         
   test:
     name: Test on ${{matrix.os}}
     runs-on: ${{matrix.os}}
@@ -68,7 +70,8 @@ jobs:
       - name: Install Rust
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
+          bins: just
           cache-base: main
       - name: Run test
         run: |
-          cargo test --all-features --workspace
+          just test
