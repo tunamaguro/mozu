@@ -13,8 +13,9 @@ pub struct Postgres {
 }
 
 impl Postgres {
-    pub async fn new(path: &str) -> Result<Self, anyhow::Error> {
-        let pg_config = tokio_postgres::Config::from_str(path)?;
+    #[tracing::instrument(skip_all)]
+    pub async fn new(pg_config: tokio_postgres::Config) -> Result<Self, anyhow::Error> {
+        tracing::info!("Connect postgres...");
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Verified,
         };
@@ -28,7 +29,33 @@ impl Postgres {
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
+        tracing::info!("Connected to postgres");
+
         Ok(Self { pool })
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn from_str(path: &str) -> Result<Self, anyhow::Error> {
+        let pg_config = tokio_postgres::Config::from_str(path)?;
+        Self::new(pg_config).await
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn from_env() -> Result<Self, anyhow::Error> {
+        let host = std::env::var("DATABASE_HOST")?;
+        let port = std::env::var("DATABASE_PORT")?;
+        let user = std::env::var("DATABASE_USER")?;
+        let password = std::env::var("DATABASE_PASSWORD")?;
+        let dbname = std::env::var("DATABASE_NAME")?;
+
+        let mut cfg = tokio_postgres::Config::new();
+        cfg.host(host.as_str())
+            .port(port.parse::<u16>()?)
+            .user(user.as_str())
+            .password(password.as_str())
+            .dbname(dbname.as_str());
+
+        Self::new(cfg.to_owned()).await
     }
 
     async fn get_client(&self) -> Result<Object, anyhow::Error> {
@@ -55,7 +82,6 @@ impl AccountRepository for Postgres {
         }
     }
     #[tracing::instrument(skip(self))]
-
     async fn find_by_id(&self, id: &AccountId) -> Result<Option<Account>, FindAccountError> {
         let client = self.get_client().await?;
         let result = queries::find_account_by_id(&client, id)

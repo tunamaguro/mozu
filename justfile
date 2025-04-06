@@ -35,17 +35,22 @@ ready: format lint-ci test
 generate:
     sqlc generate -f sqlc.json
 
+DATABASE_URL := "postgres://" + env("DATABASE_USER") + ":" + env("DATABASE_PASSWORD") + "@" + env("DATABASE_HOST") + ":" + env("DATABASE_PORT") + "/" + env("DATABASE_NAME") + "?sslmode=disable"
 MIGRATION_DIR := "src/infrastructure/postgres/migrations"
 migrate NAME:
     migrate create -ext sql -dir {{MIGRATION_DIR}} -seq {{NAME}}
 
 migrate_db_up:
-    migrate -database ${DATABASE_URL} -path {{MIGRATION_DIR}} up
+    migrate -database {{DATABASE_URL}} -path {{MIGRATION_DIR}} up
 
 migrate_db_down:
-    migrate -database ${DATABASE_URL} -path {{MIGRATION_DIR}} down
+    migrate -database {{DATABASE_URL}} -path {{MIGRATION_DIR}} down
 
-reset_db: migrate_db_down migrate_db_up
+drop_db:
+    dropdb -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER} ${DATABASE_NAME} || true
+    createdb -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER} ${DATABASE_NAME} || true
+
+reset_db: drop_db migrate_db_up
 
 # install tools
 install:
