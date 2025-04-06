@@ -1,4 +1,4 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse, routing};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -57,7 +57,7 @@ impl From<CreateAccountError> for ApiError {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn create(
+pub async fn signup(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateAccountJson>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -73,4 +73,10 @@ pub async fn create(
     };
 
     Ok((StatusCode::CREATED, Json(response)))
+}
+
+pub fn router(registry: AppRegistry) -> axum::Router {
+    axum::Router::new()
+        .route("/signup", routing::post(signup))
+        .with_state(registry)
 }

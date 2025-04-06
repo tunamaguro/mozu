@@ -65,7 +65,7 @@ pub async fn actor(
     let hosturl_service = registry.host_url_service();
     let actor = Actor::builder()
         .kind(ActorType::Person)
-        .id(hosturl_service.user_url(account_name.as_str()))
+        .id(hosturl_service.actor_url(account_name.as_str()))
         .inbox(hosturl_service.inbox_url(account_name.as_str()))
         .outbox(hosturl_service.outbox_url(account_name.as_str()))
         .preferred_username(account_name.as_str())

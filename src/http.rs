@@ -1,5 +1,6 @@
 pub(crate) mod state;
-pub(crate) mod users;
+pub(crate) mod ap;
+pub(crate) mod accounts;
 pub(crate) mod utils;
 pub(crate) mod well_known;
 use state::AppRegistryExt as _;
@@ -42,8 +43,9 @@ impl HttpServer {
 
         let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, self.port)).await?;
         let router = axum::Router::new()
+            .nest("/accounts", accounts::router(self.registry.clone()))
             .nest("/.well-known", well_known::router(self.registry.clone()))
-            .nest("/users", users::router(self.registry.clone()))
+            .nest("/ap", ap::router(self.registry.clone()))
             .layer(TraceLayer::new_for_http());
 
         tracing::info!("Listening on {}", listener.local_addr()?);

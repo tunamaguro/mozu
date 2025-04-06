@@ -34,18 +34,23 @@ pub trait HostUrlService: Send + Sync + 'static {
         format!("{}://{}", self.scheme(), self.host())
     }
 
-    /// Return user URL
-    fn user_url(&self, user: &str) -> String {
-        format!("{}/users/{}", self.base_url(), user)
+    /// Return actor URL
+    fn actor_url(&self, user: &str) -> String {
+        format!("{}/ap/actors/{}", self.base_url(), user)
+    }
+
+    /// Return shared inbox URL
+    fn shared_inbox_url(&self) -> String {
+        format!("{}/ap/inbox", self.base_url())
     }
 
     /// Return user inbox URL
     fn inbox_url(&self, user: &str) -> String {
-        format!("{}/inbox", self.user_url(user))
+        format!("{}/inbox", self.actor_url(user))
     }
 
     /// Return user outbox URL
     fn outbox_url(&self, user: &str) -> String {
-        format!("{}/outbox", self.user_url(user))
+        format!("{}/outbox", self.actor_url(user))
     }
 }
