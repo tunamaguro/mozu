@@ -15,7 +15,7 @@ format:
 
 format-ci:
     cargo fmt --all --check
-    sqlruff
+    sqruff lint
 
 lint:
     cargo clippy --workspace --all-targets --all-features
