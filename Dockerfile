@@ -1,9 +1,16 @@
 FROM rust:1.85.1-slim-bookworm
 
+# sqlc
+COPY --from=sqlc/sqlc:1.28.0 /workspace/sqlc /usr/bin/sqlc
+
 RUN apt-get update -y && \
     apt-get install -y \
     git \
-    build-essential
+    build-essential \
+    curl
+
+# golang-migrate
+RUN curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz -C /usr/bin/
 
 ARG USERNAME=vscode
 ARG GROUPNAME=vscode

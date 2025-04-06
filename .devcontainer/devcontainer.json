@@ -2,10 +2,14 @@
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.231.4/containers/rust
 {
 	"name": "Mozu develop",
-	"build": {
-		"dockerfile": "../Dockerfile",
-		"args": {}
+	"dockerComposeFile": [
+		"../compose.yaml"
+	],
+	"service": "dev",
+	"features": {
+		"ghcr.io/rails/devcontainer/features/postgres-client:1.1.2": {}
 	},
+	"workspaceFolder": "/workspace",
 	// Set *default* container specific settings.json values on container create.
 	"customizations": {
 		"vscode": {
