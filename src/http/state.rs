@@ -1,6 +1,13 @@
 use std::sync::Arc;
 
-use crate::domain::{account::adapter::AccountService, hosturl::HostUrlService};
+use crate::{
+    Postgres,
+    domain::{
+        account::{self, adapter::AccountService},
+        ap,
+        hosturl::{HostUrl, HostUrlService},
+    },
+};
 
 pub trait AppRegistryExt: Send + Sync {
     fn account_service(&self) -> Arc<dyn AccountService>;
@@ -14,14 +21,14 @@ pub struct AppRegistry {
 }
 
 impl AppRegistry {
-    pub fn new<AS, HS>(account_service: AS, host_url_service: HS) -> Self
-    where
-        AS: AccountService,
-        HS: HostUrlService,
-    {
+    pub fn from_pg_host_url(pg: Postgres, host_url: HostUrl) -> Self {
+        let host_url = Arc::new(host_url);
+        let ap_service = ap::service::Service::new(pg.clone(), host_url.clone());
+        let account_service = account::service::Service::new(pg.clone(), ap_service.clone());
+
         Self {
             account_service: Arc::new(account_service),
-            host_url_service: Arc::new(host_url_service),
+            host_url_service: host_url,
         }
     }
 }

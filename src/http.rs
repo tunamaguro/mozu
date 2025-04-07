@@ -1,16 +1,13 @@
-pub(crate) mod state;
-pub(crate) mod ap;
 pub(crate) mod accounts;
+pub(crate) mod ap;
+pub(crate) mod state;
 pub(crate) mod utils;
 pub(crate) mod well_known;
 use state::AppRegistryExt as _;
 use tokio::signal;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    domain::{account::service::Service, hosturl::HostUrl},
-    infrastructure::postgres::Postgres,
-};
+use crate::{domain::hosturl::HostUrl, infrastructure::postgres::Postgres};
 
 #[derive(Debug, TypedBuilder)]
 pub struct HttpServerConfig {
@@ -27,9 +24,7 @@ impl HttpServer {
     pub fn new(config: HttpServerConfig, pg: Postgres) -> Self {
         let host_url_service = HostUrl::new(&config.host_url);
 
-        let account_service = Service::new(pg);
-        let registry = state::AppRegistry::new(account_service, host_url_service);
-
+        let registry = state::AppRegistry::from_pg_host_url(pg, host_url_service);
         Self {
             port: config.port,
             registry,

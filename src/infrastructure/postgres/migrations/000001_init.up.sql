@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS actors (
     name VARCHAR(100) NOT NULL,
     -- Actor host
     host TEXT NOT NULL,
+    actor_url TEXT NOT NULL,
     inbox_url TEXT NOT NULL,
     outbox_url TEXT NOT NULL,
     shared_inbox_url TEXT,
@@ -30,5 +31,7 @@ CREATE TABLE IF NOT EXISTS actors (
     account_id UUID,
     FOREIGN KEY (account_id) REFERENCES accounts (id)
     ON UPDATE CASCADE
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+
+    CONSTRAINT unique_actor_name UNIQUE (name, host)
 );

@@ -1,5 +1,7 @@
 use std::{str::FromStr, sync::LazyLock};
 
+use crate::domain::HttpUrl;
+
 use super::constants::{ACTIVITYPUB_MEDIA_TYPE, ACTIVITYPUB_MEDIA_TYPE_ALT};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
@@ -15,13 +17,13 @@ pub struct WebFinger {
 
 /// See https://datatracker.ietf.org/doc/html/rfc7033#section-4.4.4
 #[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[builder(field_defaults(setter(into)))]
 pub struct WebFingerLink {
     rel: String,
     /// `type` is a reserved keyword in Rust, so we use `kind` instead
     #[serde(rename = "type")]
     kind: String,
-    href: String,
+    href: HttpUrl,
 }
 
 impl WebFingerLink {
@@ -36,7 +38,7 @@ impl WebFingerLink {
     }
 
     /// Return href if the link resolves to actor
-    pub fn actor_link(&self) -> Option<&str> {
+    pub fn actor_link(&self) -> Option<&HttpUrl> {
         if self.is_self_link() {
             Some(&self.href)
         } else {

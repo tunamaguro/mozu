@@ -46,6 +46,9 @@ migrate_db_up:
 migrate_db_down:
     migrate -database {{DATABASE_URL}} -path {{MIGRATION_DIR}} down
 
+connect_db:
+    psql -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER} ${DATABASE_NAME}
+
 drop_db:
     dropdb -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER} ${DATABASE_NAME} || true
     createdb -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER} ${DATABASE_NAME} || true
