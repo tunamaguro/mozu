@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::account::model::{
-        AccountName, AccountNameError, CreateAccountError, CreateAccountRequest,
+        AccountId, AccountName, AccountNameError, CreateAccountError, CreateAccountRequest
     },
     http::state::{AppRegistry, AppRegistryExt},
 };
@@ -15,7 +15,7 @@ pub struct CreateAccountJson {
 
 #[derive(Debug, Serialize)]
 pub struct CreateAccountResponseJson {
-    id: String,
+    id: AccountId,
     username: String,
 }
 
@@ -68,7 +68,7 @@ pub async fn signup(
     let account = account_service.create(req).await?;
 
     let response = CreateAccountResponseJson {
-        id: account.id().to_string(),
+        id: account.id().clone(),
         username: account.name().as_str().to_string(),
     };
 

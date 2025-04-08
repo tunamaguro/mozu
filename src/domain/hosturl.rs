@@ -61,6 +61,13 @@ pub trait HostUrlService: Send + Sync + 'static {
     fn outbox_url(&self, user: &str) -> HttpUrl {
         format!("{}/outbox", self.actor_url(user)).parse().unwrap()
     }
+
+    /// Return user note URL
+    fn note_url(&self, note_id: &str) -> HttpUrl {
+        format!("{}/ap/notes/{}", self.base_url(), note_id)
+            .parse()
+            .unwrap()
+    }
 }
 
 impl<S: HostUrlService> HostUrlService for Arc<S> {

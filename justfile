@@ -7,6 +7,7 @@ alias f:= format
 alias l:= lint
 alias lf:= lint-fix
 alias r:= ready
+alias dev:=dev_serveo
 
 format:
     cargo fmt --all
@@ -62,7 +63,7 @@ install:
 
 # Start dev server
 [unix]
-dev:
+dev_serveo:
     #!/usr/bin/bash
     if [ -z "${HOST_URL}" ]; then
         just start_serveo
@@ -112,3 +113,6 @@ finish_serveo:
     if [ -f ${SERVEO_ADDR} ]; then
         rm ${SERVEO_ADDR}
     fi
+
+dev_local:
+    HOST_URL="http://localhost"  bacon run-long

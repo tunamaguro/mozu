@@ -23,9 +23,7 @@ pub async fn create_account(
     accounts_id: &uuid::Uuid,
     accounts_name: &str,
 ) -> Result<u64, deadpool_postgres::tokio_postgres::Error> {
-    client
-        .execute(CREATE_ACCOUNT, &[&accounts_id, &accounts_name])
-        .await
+    client.execute(CREATE_ACCOUNT, &[&accounts_id, &accounts_name]).await
 }
 pub const FIND_ACCOUNT_BY_ID: &str = r#"-- name: FindAccountById :one
 SELECT
@@ -42,14 +40,14 @@ pub async fn find_account_by_id(
     client: &impl deadpool_postgres::GenericClient,
     accounts_id: &uuid::Uuid,
 ) -> Result<Option<FindAccountByIdRow>, deadpool_postgres::tokio_postgres::Error> {
-    let row = client
-        .query_opt(FIND_ACCOUNT_BY_ID, &[&accounts_id])
-        .await?;
+    let row = client.query_opt(FIND_ACCOUNT_BY_ID, &[&accounts_id]).await?;
     let v = match row {
-        Some(v) => FindAccountByIdRow {
-            accounts_id: v.try_get(0)?,
-            accounts_name: v.try_get(1)?,
-        },
+        Some(v) => {
+            FindAccountByIdRow {
+                accounts_id: v.try_get(0)?,
+                accounts_name: v.try_get(1)?,
+            }
+        }
         None => return Ok(None),
     };
     Ok(Some(v))
@@ -69,14 +67,107 @@ pub async fn find_account_by_name(
     client: &impl deadpool_postgres::GenericClient,
     accounts_name: &str,
 ) -> Result<Option<FindAccountByNameRow>, deadpool_postgres::tokio_postgres::Error> {
+    let row = client.query_opt(FIND_ACCOUNT_BY_NAME, &[&accounts_name]).await?;
+    let v = match row {
+        Some(v) => {
+            FindAccountByNameRow {
+                accounts_id: v.try_get(0)?,
+                accounts_name: v.try_get(1)?,
+            }
+        }
+        None => return Ok(None),
+    };
+    Ok(Some(v))
+}
+pub const GET_ACCOUNT_ACTOR: &str = r#"-- name: GetAccountActor :one
+SELECT
+    id,
+    type,
+    name,
+    host,
+    actor_url,
+    inbox_url,
+    outbox_url,
+    shared_inbox_url
+FROM actors
+WHERE account_id = $1"#;
+#[derive(PartialEq, Debug, Clone)]
+pub struct GetAccountActorRow {
+    pub actors_id: uuid::Uuid,
+    pub actors_type: ActorType,
+    pub actors_name: String,
+    pub actors_host: String,
+    pub actors_actor_url: String,
+    pub actors_inbox_url: String,
+    pub actors_outbox_url: String,
+    pub actors_shared_inbox_url: Option<String>,
+}
+pub async fn get_account_actor(
+    client: &impl deadpool_postgres::GenericClient,
+    actors_account_id: Option<&uuid::Uuid>,
+) -> Result<Option<GetAccountActorRow>, deadpool_postgres::tokio_postgres::Error> {
+    let row = client.query_opt(GET_ACCOUNT_ACTOR, &[&actors_account_id]).await?;
+    let v = match row {
+        Some(v) => {
+            GetAccountActorRow {
+                actors_id: v.try_get(0)?,
+                actors_type: v.try_get(1)?,
+                actors_name: v.try_get(2)?,
+                actors_host: v.try_get(3)?,
+                actors_actor_url: v.try_get(4)?,
+                actors_inbox_url: v.try_get(5)?,
+                actors_outbox_url: v.try_get(6)?,
+                actors_shared_inbox_url: v.try_get(7)?,
+            }
+        }
+        None => return Ok(None),
+    };
+    Ok(Some(v))
+}
+pub const GET_ACTOR_BY_NAME_AND_HOST: &str = r#"-- name: GetActorByNameAndHost :one
+SELECT
+    id,
+    type,
+    name,
+    host,
+    actor_url,
+    inbox_url,
+    outbox_url,
+    shared_inbox_url
+FROM actors
+WHERE name = $1 AND host = $2"#;
+#[derive(PartialEq, Debug, Clone)]
+pub struct GetActorByNameAndHostRow {
+    pub actors_id: uuid::Uuid,
+    pub actors_type: ActorType,
+    pub actors_name: String,
+    pub actors_host: String,
+    pub actors_actor_url: String,
+    pub actors_inbox_url: String,
+    pub actors_outbox_url: String,
+    pub actors_shared_inbox_url: Option<String>,
+}
+pub async fn get_actor_by_name_and_host(
+    client: &impl deadpool_postgres::GenericClient,
+    actors_name: &str,
+    actors_host: &str,
+) -> Result<Option<GetActorByNameAndHostRow>, deadpool_postgres::tokio_postgres::Error> {
     let row = client
-        .query_opt(FIND_ACCOUNT_BY_NAME, &[&accounts_name])
+        .query_opt(GET_ACTOR_BY_NAME_AND_HOST, &[&actors_name, &actors_host])
         .await?;
     let v = match row {
-        Some(v) => FindAccountByNameRow {
-            accounts_id: v.try_get(0)?,
-            accounts_name: v.try_get(1)?,
-        },
+        Some(v) => {
+            GetActorByNameAndHostRow {
+                actors_id: v.try_get(0)?,
+                actors_type: v.try_get(1)?,
+                actors_name: v.try_get(2)?,
+                actors_host: v.try_get(3)?,
+                actors_actor_url: v.try_get(4)?,
+                actors_inbox_url: v.try_get(5)?,
+                actors_outbox_url: v.try_get(6)?,
+                actors_shared_inbox_url: v.try_get(7)?,
+            }
+        }
         None => return Ok(None),
     };
     Ok(Some(v))
@@ -96,12 +187,12 @@ INSERT INTO actors (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (name, host) DO UPDATE
 SET
-    type = EXCLUDED.type,
-    actor_url = EXCLUDED.actor_url,
-    inbox_url = EXCLUDED.inbox_url,
-    outbox_url = EXCLUDED.outbox_url,
-    shared_inbox_url = EXCLUDED.shared_inbox_url,
-    account_id = EXCLUDED.account_id
+type = excluded.type,
+actor_url = excluded.actor_url,
+inbox_url = excluded.inbox_url,
+outbox_url = excluded.outbox_url,
+shared_inbox_url = excluded.shared_inbox_url,
+account_id = excluded.account_id
 RETURNING id"#;
 #[derive(PartialEq, Debug, Clone)]
 pub struct UpsertActorRow {
@@ -136,10 +227,134 @@ pub async fn upsert_actor(
         )
         .await?;
     let v = match row {
-        Some(v) => UpsertActorRow {
-            actors_id: v.try_get(0)?,
-        },
+        Some(v) => {
+            UpsertActorRow {
+                actors_id: v.try_get(0)?,
+            }
+        }
         None => return Ok(None),
     };
     Ok(Some(v))
+}
+pub const INSERT_ACCOUNT_KEY: &str = r#"-- name: InsertAccountKey :exec
+INSERT INTO account_keys (
+    account_id,
+    key_type,
+    public_key,
+    private_key
+)
+VALUES ($1, $2, $3, $4)"#;
+pub async fn insert_account_key(
+    client: &impl deadpool_postgres::GenericClient,
+    account_keys_account_id: &uuid::Uuid,
+    account_keys_key_type: &str,
+    account_keys_public_key: &str,
+    account_keys_private_key: &str,
+) -> Result<u64, deadpool_postgres::tokio_postgres::Error> {
+    client
+        .execute(
+            INSERT_ACCOUNT_KEY,
+            &[
+                &account_keys_account_id,
+                &account_keys_key_type,
+                &account_keys_public_key,
+                &account_keys_private_key,
+            ],
+        )
+        .await
+}
+pub const GET_ACCOUNT_KEYS: &str = r#"-- name: GetAccountKeys :many
+SELECT
+    key_type,
+    public_key,
+    private_key
+FROM account_keys
+WHERE account_id = $1"#;
+#[derive(PartialEq, Debug, Clone)]
+pub struct GetAccountKeysRow {
+    pub account_keys_key_type: String,
+    pub account_keys_public_key: String,
+    pub account_keys_private_key: String,
+}
+pub async fn get_account_keys(
+    client: &impl deadpool_postgres::GenericClient,
+    account_keys_account_id: &uuid::Uuid,
+) -> Result<
+    impl Iterator<
+        Item = Result<GetAccountKeysRow, deadpool_postgres::tokio_postgres::Error>,
+    >,
+    deadpool_postgres::tokio_postgres::Error,
+> {
+    let rows = client.query(GET_ACCOUNT_KEYS, &[&account_keys_account_id]).await?;
+    Ok(
+        rows
+            .into_iter()
+            .map(|r| Ok(GetAccountKeysRow {
+                account_keys_key_type: r.try_get(0)?,
+                account_keys_public_key: r.try_get(1)?,
+                account_keys_private_key: r.try_get(2)?,
+            })),
+    )
+}
+pub const INSERT_NOTE_SOURCE: &str = r#"-- name: InsertNoteSource :one
+INSERT INTO note_sources (
+    id,
+    account_id,
+    content
+) VALUES ($1, $2, $3)
+RETURNING id"#;
+#[derive(PartialEq, Debug, Clone)]
+pub struct InsertNoteSourceRow {
+    pub note_sources_id: uuid::Uuid,
+}
+pub async fn insert_note_source(
+    client: &impl deadpool_postgres::GenericClient,
+    note_sources_id: &uuid::Uuid,
+    note_sources_account_id: &uuid::Uuid,
+    note_sources_content: &str,
+) -> Result<Option<InsertNoteSourceRow>, deadpool_postgres::tokio_postgres::Error> {
+    let row = client
+        .query_opt(
+            INSERT_NOTE_SOURCE,
+            &[&note_sources_id, &note_sources_account_id, &note_sources_content],
+        )
+        .await?;
+    let v = match row {
+        Some(v) => {
+            InsertNoteSourceRow {
+                note_sources_id: v.try_get(0)?,
+            }
+        }
+        None => return Ok(None),
+    };
+    Ok(Some(v))
+}
+pub const INSERT_NOTE: &str = r#"-- name: InsertNote :exec
+INSERT INTO notes (
+    id,
+    actor_id,
+    source_id,
+    content,
+    note_url
+) VALUES ($1, $2, $3, $4, $5)"#;
+pub async fn insert_note(
+    client: &impl deadpool_postgres::GenericClient,
+    notes_id: &uuid::Uuid,
+    notes_actor_id: &uuid::Uuid,
+    notes_source_id: Option<&uuid::Uuid>,
+    notes_content: &str,
+    notes_note_url: &str,
+) -> Result<u64, deadpool_postgres::tokio_postgres::Error> {
+    client
+        .execute(
+            INSERT_NOTE,
+            &[
+                &notes_id,
+                &notes_actor_id,
+                &notes_source_id,
+                &notes_content,
+                &notes_note_url,
+            ],
+        )
+        .await
 }

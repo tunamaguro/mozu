@@ -1,7 +1,7 @@
 mod queries;
 use std::str::FromStr;
 
-use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
+use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod, Transaction};
 
 #[derive(Clone)]
 pub struct Postgres {
@@ -65,6 +65,14 @@ impl Postgres {
     }
 }
 
+async fn get_transaction(client: &mut Object) -> Result<Transaction, anyhow::Error> {
+    client
+        .transaction()
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+        .inspect_err(|e| tracing::error!(error = %e, "Failed to get transaction"))
+}
+
 mod account_repository_impl {
     use crate::domain::account::{
         adapter::AccountRepository,
@@ -124,9 +132,16 @@ mod account_repository_impl {
 }
 
 mod ap_repository_impl {
-    use crate::domain::ap::{
-        adapter::ApRepository,
-        model::{ActorRow, CreateActorError},
+    use crate::domain::{
+        HttpUrlError,
+        account::model::AccountId,
+        ap::{
+            adapter::ActorRepository,
+            model::{
+                ActorRow, CreateActorError,
+                actor::{FindActorError, FindRemoteActorRequest},
+            },
+        },
     };
 
     use super::*;
@@ -154,8 +169,15 @@ mod ap_repository_impl {
         }
     }
 
+    impl From<HttpUrlError> for FindActorError {
+        fn from(e: HttpUrlError) -> Self {
+            tracing::error!(error = %e, "expected database url to be valid but got invalid url");
+            FindActorError::Unknown(e.into())
+        }
+    }
+
     #[async_trait::async_trait]
-    impl ApRepository for Postgres {
+    impl ActorRepository for Postgres {
         async fn upsert_actor(&self, mut actor: ActorRow) -> Result<ActorRow, CreateActorError> {
             let actor_type = actor.actor_type.into();
             let client = self.get_client().await?;
@@ -188,6 +210,153 @@ mod ap_repository_impl {
                 }
                 Err(e) if e.is_closed() => Err(CreateActorError::Unknown(e.into())),
                 Err(_) => Err(CreateActorError::AlreadyExists),
+            }
+        }
+
+        async fn find_local_actor(
+            &self,
+            account_id: &AccountId,
+        ) -> Result<ActorRow, FindActorError> {
+            let client = self.get_client().await?;
+            let result = queries::get_account_actor(&client, Some(account_id)).await;
+            match result {
+                Ok(Some(row)) => {
+                    let actor_row = ActorRow {
+                        id: row.actors_id.into(),
+                        actor_type: row.actors_type.into(),
+                        name: row.actors_name,
+                        inbox_url: row.actors_inbox_url.parse()?,
+                        outbox_url: row.actors_outbox_url.parse()?,
+                        actor_url: row.actors_actor_url.parse()?,
+                        account_id: Some(account_id.clone()),
+                        shared_inbox_url: row
+                            .actors_shared_inbox_url
+                            .map(|s| s.parse())
+                            .transpose()?,
+                    };
+
+                    Ok(actor_row)
+                }
+                Ok(None) => {
+                    tracing::info!(account_id = %account_id, "Actor not found");
+                    return Err(FindActorError::NotFound);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to find local actor");
+                    return Err(FindActorError::Unknown(e.into()));
+                }
+            }
+        }
+        async fn find_remote_actor(
+            &self,
+            req: &FindRemoteActorRequest,
+        ) -> Result<ActorRow, FindActorError> {
+            let client = self.get_client().await?;
+            let result = queries::get_actor_by_name_and_host(&client, &req.name, &req.host).await;
+            match result {
+                Ok(Some(row)) => {
+                    let actor_row = ActorRow {
+                        id: row.actors_id.into(),
+                        actor_type: row.actors_type.into(),
+                        name: row.actors_name,
+                        inbox_url: row.actors_inbox_url.parse()?,
+                        outbox_url: row.actors_outbox_url.parse()?,
+                        actor_url: row.actors_actor_url.parse()?,
+                        account_id: None,
+                        shared_inbox_url: None,
+                    };
+
+                    Ok(actor_row)
+                }
+                Ok(None) => {
+                    tracing::info!(name = %req.name, host = %req.host, "Actor not found");
+                    return Err(FindActorError::NotFound);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to find remote actor");
+                    return Err(FindActorError::Unknown(e.into()));
+                }
+            }
+        }
+    }
+}
+
+mod note_repository_impl {
+    use super::*;
+    use crate::domain::ap::{
+        adapter::NoteRepository,
+        model::note::{CreateLocalNoteError, CreateRemoteNoteError, LocalNote, RemoteNote},
+    };
+
+    #[async_trait::async_trait]
+    impl NoteRepository for Postgres {
+        async fn create_local_note(
+            &self,
+            req: LocalNote,
+        ) -> Result<LocalNote, CreateLocalNoteError> {
+            let mut client = self.get_client().await?;
+            let transaction = get_transaction(&mut client).await?;
+            let note_source =
+                queries::insert_note_source(&transaction, &req.id, &req.account_id, &req.content)
+                    .await;
+            let note_source = match note_source {
+                Ok(Some(row)) => row,
+                Ok(None) => {
+                    let e = anyhow::anyhow!("Insert success but no row returned");
+                    tracing::error!(e = %e,"Failed to insert note source");
+                    return Err(CreateLocalNoteError::Unknown(e));
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to insert note source");
+                    return Err(CreateLocalNoteError::Unknown(e.into()));
+                }
+            };
+
+            let result = queries::insert_note(
+                &transaction,
+                &req.id,
+                &req.actor_id,
+                Some(&note_source.note_sources_id),
+                &req.content,
+                req.note_url.as_str(),
+            )
+            .await;
+            if let Err(e) = result {
+                tracing::error!(error = %e, "Failed to insert note");
+                return Err(CreateLocalNoteError::Unknown(e.into()));
+            };
+
+            match transaction.commit().await {
+                Ok(_) => Ok(req),
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to commit transaction");
+                    return Err(CreateLocalNoteError::Unknown(e.into()));
+                }
+            }
+        }
+
+        async fn create_remote_note(
+            &self,
+            req: RemoteNote,
+        ) -> Result<RemoteNote, CreateRemoteNoteError> {
+            let client = self.get_client().await?;
+
+            let result = queries::insert_note(
+                &client,
+                &req.id,
+                &req.actor_id,
+                None,
+                &req.content,
+                req.note_url.as_str(),
+            )
+            .await;
+
+            match result {
+                Ok(_) => Ok(req),
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to insert remote note");
+                    Err(CreateRemoteNoteError::Unknown(e.into()))
+                }
             }
         }
     }

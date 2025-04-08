@@ -7,33 +7,42 @@ use crate::{
 };
 
 use super::{
-    adapter::{ApRepository, ApService},
+    adapter::{ActorRepository, ApService, NoteRepository},
     model::{
-        CreateLocalActorError, CreateLocalActorRequest, CreateRemoteActorError,
-        CreateRemoteActorRequest, LocalActor, RemoteActor,
+        actor::FindRemoteActorRequest, note::{
+            CreateLocalNoteError, CreateLocalNoteRequest, CreateRemoteNoteError,
+            CreateRemoteNoteRequest, LocalNote, NoteId, RemoteNote,
+        }, CreateLocalActorError, CreateLocalActorRequest, CreateRemoteActorError, CreateRemoteActorRequest, LocalActor, RemoteActor
     },
 };
 
 #[derive(Debug, Clone)]
-pub struct Service<R, H> {
-    repo: R,
+pub struct Service<AR, NR, H> {
+    actor_repo: AR,
+    note_repo: NR,
     host_url: H,
 }
 
-impl<R, H> Service<R, H>
+impl<AR, NR, H> Service<AR, NR, H>
 where
-    R: ApRepository,
+    AR: ActorRepository,
+    NR: NoteRepository,
     H: HostUrlService,
 {
-    pub fn new(repo: R, host_url: H) -> Self {
-        Self { repo, host_url }
+    pub fn new(actor_repo: AR, note_repo: NR, host_url: H) -> Self {
+        Self {
+            actor_repo,
+            note_repo,
+            host_url,
+        }
     }
 }
 
 #[async_trait::async_trait]
-impl<R, H> ApService for Service<R, H>
+impl<AR, NR, H> ApService for Service<AR, NR, H>
 where
-    R: ApRepository,
+    AR: ActorRepository,
+    NR: NoteRepository,
     H: HostUrlService,
 {
     async fn create_local_actor(
@@ -56,12 +65,13 @@ where
             account_id: account_id.into(),
             shared_inbox_url: shared_inbox_url.into(),
         };
-        let actor_row = self.repo.upsert_actor(row).await?;
+        let actor_row = self.actor_repo.upsert_actor(row).await?;
 
         let local_actor = LocalActor::try_from(actor_row)?;
 
         Ok(local_actor)
     }
+
     async fn create_remote_actor(
         &self,
         req: CreateRemoteActorRequest,
@@ -85,8 +95,50 @@ where
             account_id: None,
             shared_inbox_url,
         };
-        let actor_row = self.repo.upsert_actor(actor_row).await?;
+        let actor_row = self.actor_repo.upsert_actor(actor_row).await?;
         let remote_actor = RemoteActor::from(actor_row);
         Ok(remote_actor)
+    }
+
+    async fn create_local_note(
+        &self,
+        req: CreateLocalNoteRequest,
+    ) -> Result<LocalNote, CreateLocalNoteError> {
+        let actor = self.actor_repo.find_local_actor(&req.account_id).await?;
+
+        let note_id = NoteId::new();
+        let note_url = self.host_url.note_url(&note_id.to_string());
+
+        let note = LocalNote {
+            id: note_id,
+            actor_id: actor.id,
+            account_id: req.account_id,
+            content: req.content,
+            note_url,
+        };
+
+        let note = self.note_repo.create_local_note(note).await?;
+        Ok(note)
+    }
+
+    async fn create_remote_note(
+        &self,
+        req: CreateRemoteNoteRequest,
+    ) -> Result<RemoteNote, CreateRemoteNoteError> {
+        let remote_actor_req = FindRemoteActorRequest{
+            name:req.name,
+            host:req.host
+        };
+        let actor = self.actor_repo.find_remote_actor(&remote_actor_req).await?;
+        let note_id = NoteId::new();
+
+        let remote_note =RemoteNote{
+            id: note_id,
+            actor_id: actor.id,
+            content: req.content,
+            note_url: req.note_url,
+        };
+        let note = self.note_repo.create_remote_note(remote_note).await?;
+        Ok(note)
     }
 }
