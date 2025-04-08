@@ -102,7 +102,7 @@ pub async fn webfinger(
         WebFingerLink::builder()
             .rel("self")
             .kind("application/activity+json")
-            .href(host_service.user_url(account.name().as_str()))
+            .href(host_service.actor_url(account.name().as_str()))
             .build(),
     ];
 

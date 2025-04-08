@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
+use crate::domain::HttpUrl;
+
 /// See https://www.w3.org/TR/activitystreams-vocabulary/#actor-types
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ActorType {
     Person,
     Application,
@@ -14,11 +16,11 @@ pub enum ActorType {
 /// See https://www.w3.org/TR/activitystreams-core/#actors
 #[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
 pub struct Actor {
-    pub id: String,
+    pub id: HttpUrl,
     #[serde(rename = "type")]
     pub kind: ActorType,
-    pub inbox: String,
-    pub outbox: String,
+    pub inbox: HttpUrl,
+    pub outbox: HttpUrl,
 
     /// used for user displayed name
     ///

@@ -4,10 +4,7 @@ use mozu::{HttpServer, HttpServerConfig, Postgres};
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    tracing::info!("Connect postgres...");
-    let postgres_url = std::env::var("DATABASE_URL")?;
-    let pg = Postgres::new(&postgres_url).await?;
-    tracing::info!("Connected to postgres");
+    let pg = Postgres::from_env().await?;
 
     tracing::info!("Starting HTTP server...");
     let server_config = HttpServerConfig::builder()

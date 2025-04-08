@@ -1,4 +1,5 @@
 pub mod account;
+pub mod ap;
 pub mod hosturl;
 
 use std::{ops::Deref, str::FromStr};
@@ -84,5 +85,97 @@ impl<'de, T> Deserialize<'de> for Id<T> {
     {
         let uuid = uuid::Uuid::deserialize(deserializer)?;
         Ok(Id::from_uuid(uuid))
+    }
+}
+
+/// Wrapper for `url::Url` to ensure it is `http` or `https` and has a host.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HttpUrl(url::Url);
+
+const VALID_SCHEMES: &[&str] = &["http", "https"];
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum HttpUrlError {
+    #[error(transparent)]
+    InvalidUrl(#[from] url::ParseError),
+    #[error("missing host")]
+    MissingHost,
+    #[error("expected `http` or `https` scheme")]
+    InvalidScheme,
+}
+
+impl HttpUrl {
+    pub fn new(url: url::Url) -> Result<Self, HttpUrlError> {
+        if !VALID_SCHEMES.contains(&url.scheme()) {
+            return Err(HttpUrlError::InvalidScheme);
+        }
+
+        if url.host_str().is_none() {
+            return Err(HttpUrlError::MissingHost);
+        }
+
+        Ok(Self(url))
+    }
+
+    pub fn host(&self) -> &str {
+        self.0.host_str().unwrap()
+    }
+
+    pub fn scheme(&self) -> &str {
+        self.0.scheme()
+    }
+}
+
+impl Deref for HttpUrl {
+    type Target = url::Url;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<HttpUrl> for url::Url {
+    fn from(host_url: HttpUrl) -> Self {
+        host_url.0
+    }
+}
+
+impl TryFrom<url::Url> for HttpUrl {
+    type Error = HttpUrlError;
+
+    fn try_from(url: url::Url) -> Result<Self, Self::Error> {
+        Self::new(url)
+    }
+}
+impl FromStr for HttpUrl {
+    type Err = HttpUrlError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let url = url::Url::parse(s)?;
+        Self::new(url)
+    }
+}
+impl std::fmt::Display for HttpUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Serialize for HttpUrl {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for HttpUrl {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let url = url::Url::deserialize(deserializer)?;
+        Self::new(url).map_err(serde::de::Error::custom)
     }
 }

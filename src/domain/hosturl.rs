@@ -1,4 +1,8 @@
+use std::sync::Arc;
+
 use url::Url;
+
+use super::HttpUrl;
 
 #[derive(Debug, Clone)]
 pub struct HostUrl {
@@ -30,22 +34,52 @@ pub trait HostUrlService: Send + Sync + 'static {
     fn host(&self) -> &str;
 
     /// Returns the base URL `scheme://host`
-    fn base_url(&self) -> String {
+    fn base_url(&self) -> HttpUrl {
         format!("{}://{}", self.scheme(), self.host())
+            .parse()
+            .unwrap()
     }
 
-    /// Return user URL
-    fn user_url(&self, user: &str) -> String {
-        format!("{}/users/{}", self.base_url(), user)
+    /// Return actor URL
+    fn actor_url(&self, user: &str) -> HttpUrl {
+        format!("{}/ap/actors/{}", self.base_url(), user)
+            .parse()
+            .unwrap()
     }
 
-    /// Return user inbox URL
-    fn inbox_url(&self, user: &str) -> String {
-        format!("{}/inbox", self.user_url(user))
+    /// Return shared inbox URL
+    fn shared_inbox_url(&self) -> HttpUrl {
+        format!("{}/ap/inbox", self.base_url()).parse().unwrap()
     }
 
-    /// Return user outbox URL
-    fn outbox_url(&self, user: &str) -> String {
-        format!("{}/outbox", self.user_url(user))
+    /// Return actor_name inbox URL
+    fn inbox_url(&self, actor_name: &str) -> HttpUrl {
+        format!("{}/inbox", self.actor_url(actor_name))
+            .parse()
+            .unwrap()
+    }
+
+    /// Return actor_name outbox URL
+    fn outbox_url(&self, actor_name: &str) -> HttpUrl {
+        format!("{}/outbox", self.actor_url(actor_name))
+            .parse()
+            .unwrap()
+    }
+
+    /// Return user note URL
+    fn note_url(&self, note_id: &str) -> HttpUrl {
+        format!("{}/ap/notes/{}", self.base_url(), note_id)
+            .parse()
+            .unwrap()
+    }
+}
+
+impl<S: HostUrlService> HostUrlService for Arc<S> {
+    fn scheme(&self) -> &str {
+        self.as_ref().scheme()
+    }
+
+    fn host(&self) -> &str {
+        self.as_ref().host()
     }
 }

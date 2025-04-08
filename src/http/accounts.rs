@@ -1,9 +1,9 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse, routing};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::account::model::{
-        AccountName, AccountNameError, CreateAccountError, CreateAccountRequest,
+        AccountId, AccountName, AccountNameError, CreateAccountError, CreateAccountRequest,
     },
     http::state::{AppRegistry, AppRegistryExt},
 };
@@ -15,7 +15,7 @@ pub struct CreateAccountJson {
 
 #[derive(Debug, Serialize)]
 pub struct CreateAccountResponseJson {
-    id: String,
+    id: AccountId,
     username: String,
 }
 
@@ -57,7 +57,7 @@ impl From<CreateAccountError> for ApiError {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn create(
+pub async fn signup(
     State(registry): State<AppRegistry>,
     Json(payload): Json<CreateAccountJson>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -68,9 +68,15 @@ pub async fn create(
     let account = account_service.create(req).await?;
 
     let response = CreateAccountResponseJson {
-        id: account.id().to_string(),
+        id: account.id().clone(),
         username: account.name().as_str().to_string(),
     };
 
     Ok((StatusCode::CREATED, Json(response)))
+}
+
+pub fn router(registry: AppRegistry) -> axum::Router {
+    axum::Router::new()
+        .route("/signup", routing::post(signup))
+        .with_state(registry)
 }

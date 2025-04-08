@@ -53,6 +53,7 @@ impl AccountName {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CreateAccountRequest {
     pub name: AccountName,
 }

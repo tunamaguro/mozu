@@ -4,7 +4,6 @@ use serde::Deserialize;
 use super::state::AppRegistry;
 
 mod actor;
-mod create;
 mod inbox;
 mod outbox;
 
@@ -15,9 +14,9 @@ pub struct Params {
 
 pub fn router(registry: AppRegistry) -> axum::Router {
     axum::Router::new()
-        .route("/", routing::post(create::create))
-        .route("/{user_name}", routing::get(actor::actor))
-        .route("/{user_name}/inbox", routing::get(inbox::inbox))
-        .route("/{user_name}/outbox", routing::get(outbox::outbox))
+        .route("/inbox", routing::post(inbox::inbox))
+        .route("/actors/{user_name}", routing::get(actor::actor))
+        .route("/actors/{user_name}/inbox", routing::post(inbox::inbox))
+        .route("/actors/{user_name}/outbox", routing::post(outbox::outbox))
         .with_state(registry)
 }
