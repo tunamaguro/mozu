@@ -52,14 +52,14 @@ pub trait HostUrlService: Send + Sync + 'static {
         format!("{}/ap/inbox", self.base_url()).parse().unwrap()
     }
 
-    /// Return user inbox URL
-    fn inbox_url(&self, user: &str) -> HttpUrl {
-        format!("{}/inbox", self.actor_url(user)).parse().unwrap()
+    /// Return actor_name inbox URL
+    fn inbox_url(&self, actor_name: &str) -> HttpUrl {
+        format!("{}/inbox", self.actor_url(actor_name)).parse().unwrap()
     }
 
-    /// Return user outbox URL
-    fn outbox_url(&self, user: &str) -> HttpUrl {
-        format!("{}/outbox", self.actor_url(user)).parse().unwrap()
+    /// Return actor_name outbox URL
+    fn outbox_url(&self, actor_name: &str) -> HttpUrl {
+        format!("{}/outbox", self.actor_url(actor_name)).parse().unwrap()
     }
 
     /// Return user note URL
