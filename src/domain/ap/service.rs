@@ -9,10 +9,13 @@ use crate::{
 use super::{
     adapter::{ActorRepository, ApService, NoteRepository},
     model::{
-        actor::FindRemoteActorRequest, note::{
+        CreateLocalActorError, CreateLocalActorRequest, CreateRemoteActorError,
+        CreateRemoteActorRequest, LocalActor, RemoteActor,
+        actor::FindRemoteActorRequest,
+        note::{
             CreateLocalNoteError, CreateLocalNoteRequest, CreateRemoteNoteError,
             CreateRemoteNoteRequest, LocalNote, NoteId, RemoteNote,
-        }, CreateLocalActorError, CreateLocalActorRequest, CreateRemoteActorError, CreateRemoteActorRequest, LocalActor, RemoteActor
+        },
     },
 };
 
@@ -125,14 +128,14 @@ where
         &self,
         req: CreateRemoteNoteRequest,
     ) -> Result<RemoteNote, CreateRemoteNoteError> {
-        let remote_actor_req = FindRemoteActorRequest{
-            name:req.name,
-            host:req.host
+        let remote_actor_req = FindRemoteActorRequest {
+            name: req.name,
+            host: req.host,
         };
         let actor = self.actor_repo.find_remote_actor(&remote_actor_req).await?;
         let note_id = NoteId::new();
 
-        let remote_note =RemoteNote{
+        let remote_note = RemoteNote {
             id: note_id,
             actor_id: actor.id,
             content: req.content,

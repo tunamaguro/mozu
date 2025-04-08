@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::account::model::{
-        AccountId, AccountName, AccountNameError, CreateAccountError, CreateAccountRequest
+        AccountId, AccountName, AccountNameError, CreateAccountError, CreateAccountRequest,
     },
     http::state::{AppRegistry, AppRegistryExt},
 };
