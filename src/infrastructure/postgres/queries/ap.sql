@@ -80,3 +80,9 @@ INSERT INTO notes (
     content,
     note_url
 ) VALUES ($1, $2, $3, $4, $5);
+
+-- name: CreateFollow :exec
+INSERT INTO follows (
+    follower_id,
+    followee_id
+) VALUES ($1, $2);
