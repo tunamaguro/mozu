@@ -3,9 +3,11 @@ use mime;
 use std::sync::LazyLock;
 
 mod actor;
+mod activity;
 pub mod webfinger;
 
 pub use actor::{Actor, ActorType};
+pub use activity::{Activity, RelationshipActivity, StatusActivity};
 pub use webfinger::{WebFinger, WebFingerLink};
 
 use serde::{Deserialize, Serialize};
