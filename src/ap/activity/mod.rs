@@ -12,7 +12,7 @@ use crate::domain::HttpUrl;
 #[serde(untagged)]
 pub enum Activity {
     Status(StatusActivity),
-    Relationship(RelationshipActivity),
+    Relationship(Box<RelationshipActivity>),
 }
 
 /// ActivityPub audience fields

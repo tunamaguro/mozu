@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::domain::HttpUrl;
+use crate::{ap::UrlOrObject, domain::HttpUrl};
 
 use super::Audience;
 
@@ -32,5 +32,5 @@ pub struct StatusActivity {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(default)]
-    pub object: Option<HttpUrl>,
+    pub object: Option<UrlOrObject>,
 }

@@ -2,15 +2,23 @@
 use mime;
 use std::sync::LazyLock;
 
-mod actor;
 mod activity;
+mod actor;
 pub mod webfinger;
 
-pub use actor::{Actor, ActorType};
 pub use activity::{Activity, RelationshipActivity, StatusActivity};
+pub use actor::{Actor, ActorType};
 pub use webfinger::{WebFinger, WebFingerLink};
 
 use serde::{Deserialize, Serialize};
+
+use crate::domain::HttpUrl;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum UrlOrObject {
+    Url(HttpUrl),
+    Object(serde_json::Value),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Context<T> {
