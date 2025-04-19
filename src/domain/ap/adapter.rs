@@ -1,53 +1,47 @@
-use crate::domain::account::model::AccountId;
+use crate::domain::{HttpUrl, account::model::AccountId};
 
 use super::model::{
-    ActorRow, CreateActorError, CreateLocalActorError, CreateLocalActorRequest,
-    CreateRemoteActorError, CreateRemoteActorRequest, LocalActor, RemoteActor,
-    actor::{FindActorError, FindRemoteActorRequest},
-    note::{
-        CreateLocalNoteError, CreateLocalNoteRequest, CreateRemoteNoteError,
-        CreateRemoteNoteRequest, LocalNote, RemoteNote,
-    },
+    ActorId, ActorRow, CreateActorError, LocalActor,
+    actor::{Actor, FindActorError, ResolveActorError, ResolveActorRequest, WebFingerError},
 };
 
 #[async_trait::async_trait]
-pub trait ApService: Send + Sync + 'static {
+pub trait ActorService: Send + Sync + 'static {
+    /// Creates a new local actor
     async fn create_local_actor(
         &self,
-        req: CreateLocalActorRequest,
-    ) -> Result<LocalActor, CreateLocalActorError>;
-    async fn create_remote_actor(
-        &self,
-        req: CreateRemoteActorRequest,
-    ) -> Result<RemoteActor, CreateRemoteActorError>;
-
-    async fn create_local_note(
-        &self,
-        req: CreateLocalNoteRequest,
-    ) -> Result<LocalNote, CreateLocalNoteError>;
-
-    async fn create_remote_note(
-        &self,
-        req: CreateRemoteNoteRequest,
-    ) -> Result<RemoteNote, CreateRemoteNoteError>;
+        account_id: &AccountId,
+    ) -> Result<LocalActor, CreateActorError>;
+    /// Finds an actor by its ID
+    async fn find_actor_by_id(&self, id: &ActorId) -> Result<Option<Actor>, FindActorError>;
+    /// Resolves an actor by its URL
+    async fn resolve_actor_by_url(&self, actor_id: &HttpUrl) -> Result<Actor, ResolveActorError>;
+    /// Resolves an actor by its name and host
+    async fn resolve_actor(&self, req: &ResolveActorRequest) -> Result<Actor, ResolveActorError>;
 }
 
-#[async_trait::async_trait]
-pub trait ActorRepository: Send + Sync + 'static {
-    async fn upsert_actor(&self, req: ActorRow) -> Result<ActorRow, CreateActorError>;
-    async fn find_local_actor(&self, account_id: &AccountId) -> Result<ActorRow, FindActorError>;
-    async fn find_remote_actor(
+#[trait_variant::make(ActorRepository:Send)]
+pub trait LocalActorRepository: Send + Sync + 'static {
+    async fn create(&self, actor: ActorRow) -> Result<ActorRow, (ActorRow, CreateActorError)>;
+    async fn find_by_id(&self, id: &ActorId) -> Result<Option<ActorRow>, FindActorError>;
+    async fn find_by_url(&self, url: &HttpUrl) -> Result<Option<ActorRow>, FindActorError>;
+    async fn find_by_host_name(
         &self,
-        req: &FindRemoteActorRequest,
-    ) -> Result<ActorRow, FindActorError>;
+        host: &str,
+        name: &str,
+    ) -> Result<Option<ActorRow>, FindActorError>;
+    async fn find_by_account_id(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Option<ActorRow>, FindActorError>;
 }
 
-#[async_trait::async_trait]
-pub trait NoteRepository: Send + Sync + 'static {
-    async fn create_local_note(&self, req: LocalNote) -> Result<LocalNote, CreateLocalNoteError>;
-
-    async fn create_remote_note(
+#[trait_variant::make(WebFingerPort:Send)]
+pub trait LocalWebFingerPort: Send + Sync + 'static {
+    async fn lookup_by_id(&self, actor_id: &HttpUrl) -> Result<crate::ap::Actor, WebFingerError>;
+    async fn lookup_by_host_name(
         &self,
-        req: RemoteNote,
-    ) -> Result<RemoteNote, CreateRemoteNoteError>;
+        host: &str,
+        name: &str,
+    ) -> Result<crate::ap::Actor, WebFingerError>;
 }

@@ -1,4 +1,4 @@
-use crate::domain::ap::{adapter::ApService, model::CreateLocalActorRequest};
+use crate::domain::ap::adapter::ActorService;
 
 use super::{
     adapter::{AccountRepository, AccountService},
@@ -16,7 +16,7 @@ pub struct Service<R, AP> {
 impl<R, AP> Service<R, AP>
 where
     R: AccountRepository,
-    AP: ApService,
+    AP: ActorService,
 {
     pub fn new(repo: R, ap: AP) -> Self {
         Self { repo, ap }
@@ -27,7 +27,7 @@ where
 impl<R, AP> AccountService for Service<R, AP>
 where
     R: AccountRepository,
-    AP: ApService,
+    AP: ActorService,
 {
     #[tracing::instrument(skip(self))]
     async fn create(&self, req: CreateAccountRequest) -> Result<Account, CreateAccountError> {
@@ -38,17 +38,14 @@ where
 
         tracing::info!("Creating actor");
 
-        let local_actor_req = CreateLocalActorRequest {
-            account_id: created_account.id().clone(),
-            name: created_account.name().clone(),
-        };
-
-        let _ = self
-            .ap
-            .create_local_actor(local_actor_req)
-            .await
-            .inspect_err(|e| tracing::error!(error=%e,"Failed create local actor"))
-            .map_err(|e| anyhow::anyhow!(e))?;
+        let local_actor = self.ap.create_local_actor(created_account.id()).await;
+        match local_actor {
+            Ok(_) => tracing::info!("Actor created"),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to create actor");
+                return Err(CreateAccountError::Unknown(e.into()));
+            }
+        }
 
         Ok(created_account)
     }

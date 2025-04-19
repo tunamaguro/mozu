@@ -97,19 +97,16 @@ pub async fn webfinger(
             format!("account {} not found", account_name.as_str()).into(),
         ));
     };
+    let links = vec![WebFingerLink {
+        rel: "self".to_string(),
+        kind: Some(constants::ACTIVITYPUB_MEDIA_TYPE.to_string()),
+        href: Some(host_service.actor_url(account.name().as_str())),
+    }];
 
-    let links = vec![
-        WebFingerLink::builder()
-            .rel("self")
-            .kind("application/activity+json")
-            .href(host_service.actor_url(account.name().as_str()))
-            .build(),
-    ];
-
-    let webfinger = WebFinger::builder()
-        .subject(format!("acct:{}@{}", account.name().as_str(), host))
-        .links(links)
-        .build();
+    let webfinger = WebFinger {
+        subject: format!("acct:{}@{}", account.name().as_str(), host),
+        links,
+    };
 
     Ok(ApiSuccess::new(StatusCode::OK, webfinger))
 }

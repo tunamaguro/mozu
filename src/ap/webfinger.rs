@@ -4,26 +4,29 @@ use crate::domain::HttpUrl;
 
 use super::constants::{ACTIVITYPUB_MEDIA_TYPE, ACTIVITYPUB_MEDIA_TYPE_ALT};
 use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
 
 /// See https://datatracker.ietf.org/doc/html/rfc7033
-#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebFinger {
-    subject: String,
+    pub subject: String,
     #[serde(default)]
-    links: Vec<WebFingerLink>,
+    pub links: Vec<WebFingerLink>,
+}
+
+impl WebFinger {
+    pub fn actor_link(&self) -> Option<&HttpUrl> {
+        self.links.iter().find_map(|link| link.actor_link())
+    }
 }
 
 /// See https://datatracker.ietf.org/doc/html/rfc7033#section-4.4.4
-#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebFingerLink {
-    rel: String,
+    pub rel: String,
     /// `type` is a reserved keyword in Rust, so we use `kind` instead
     #[serde(rename = "type")]
-    kind: String,
-    href: HttpUrl,
+    pub kind: Option<String>,
+    pub href: Option<HttpUrl>,
 }
 
 impl WebFingerLink {
@@ -32,15 +35,17 @@ impl WebFingerLink {
     /// See https://docs.joinmastodon.org/spec/webfinger/#mastodons-requirements-for-webfinger
     pub fn is_self_link(&self) -> bool {
         let is_self = self.rel == "self";
-        let is_activitypub =
-            self.kind == ACTIVITYPUB_MEDIA_TYPE || self.kind == ACTIVITYPUB_MEDIA_TYPE_ALT;
+        let Some(kind) = self.kind.as_ref() else {
+            return false;
+        };
+        let is_activitypub = kind == ACTIVITYPUB_MEDIA_TYPE || kind == ACTIVITYPUB_MEDIA_TYPE_ALT;
         is_self && is_activitypub
     }
 
     /// Return href if the link resolves to actor
     pub fn actor_link(&self) -> Option<&HttpUrl> {
         if self.is_self_link() {
-            Some(&self.href)
+            self.href.as_ref()
         } else {
             None
         }

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::{
     Postgres,
     domain::{
-        account::{self, adapter::AccountService},
-        ap::{self, adapter::ApService},
+        account::adapter::AccountService,
+        ap::adapter::ActorService,
         hosturl::{HostUrl, HostUrlService},
     },
 };
@@ -12,29 +12,19 @@ use crate::{
 pub trait AppRegistryExt: Send + Sync {
     fn account_service(&self) -> Arc<dyn AccountService>;
     fn host_url_service(&self) -> Arc<dyn HostUrlService>;
-    fn ap_service(&self) -> Arc<dyn ApService>;
+    fn actor_service(&self) -> Arc<dyn ActorService>;
 }
 
 #[derive(Clone)]
 pub struct AppRegistry {
     account_service: Arc<dyn AccountService>,
     host_url_service: Arc<dyn HostUrlService>,
-    ap_service: Arc<dyn ApService>,
+    actor_service: Arc<dyn ActorService>,
 }
 
 impl AppRegistry {
     pub fn from_pg_host_url(pg: Postgres, host_url: HostUrl) -> Self {
-        let host_url = Arc::new(host_url);
-
-        let ap_service = ap::service::Service::new(pg.clone(), pg.clone(), host_url.clone());
-
-        let account_service = account::service::Service::new(pg.clone(), ap_service.clone());
-
-        Self {
-            account_service: Arc::new(account_service),
-            ap_service: Arc::new(ap_service),
-            host_url_service: host_url,
-        }
+        todo!()
     }
 }
 
@@ -47,7 +37,7 @@ impl AppRegistryExt for AppRegistry {
         self.host_url_service.clone()
     }
 
-    fn ap_service(&self) -> Arc<dyn ApService> {
-        self.ap_service.clone()
+    fn actor_service(&self) -> Arc<dyn ActorService> {
+        self.actor_service.clone()
     }
 }

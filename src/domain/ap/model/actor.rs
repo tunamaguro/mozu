@@ -1,9 +1,6 @@
 use crate::{
     ap::ActorType,
-    domain::{
-        HttpUrl, Id,
-        account::model::{AccountId, AccountName},
-    },
+    domain::{HttpUrl, Id, account::model::AccountId},
 };
 
 pub type ActorId = Id<ActorRow>;
@@ -36,8 +33,10 @@ impl ActorRow {
 pub enum CreateActorError {
     #[error("actor is already exists")]
     AlreadyExists,
+    #[error("account is not exists")]
+    AccountNotExists,
     #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    DataBaseError(anyhow::Error),
 }
 
 #[derive(Debug, Clone)]
@@ -58,37 +57,6 @@ pub struct LocalActor {
     pub account_id: AccountId,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum RowToLocalActorError {
-    #[error("local actor must have account id")]
-    AccountIdNotFound,
-    #[error("local actor must have shared inbox url")]
-    SharedInboxNotFound,
-}
-
-impl TryFrom<ActorRow> for LocalActor {
-    type Error = RowToLocalActorError;
-
-    fn try_from(row: ActorRow) -> Result<Self, Self::Error> {
-        let account_id = row
-            .account_id
-            .ok_or(RowToLocalActorError::AccountIdNotFound)?;
-        let shared_inbox_url = row
-            .shared_inbox_url
-            .ok_or(RowToLocalActorError::SharedInboxNotFound)?;
-        Ok(Self {
-            id: row.id,
-            actor_type: row.actor_type,
-            name: row.name,
-            actor_url: row.actor_url,
-            inbox_url: row.inbox_url,
-            outbox_url: row.outbox_url,
-            shared_inbox_url,
-            account_id,
-        })
-    }
-}
-
 impl From<LocalActor> for ActorRow {
     fn from(actor: LocalActor) -> Self {
         Self {
@@ -104,48 +72,8 @@ impl From<LocalActor> for ActorRow {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum CreateLocalActorError {
-    #[error("actor is already exists")]
-    AlreadyExists,
-    #[error("local actor must have account id")]
-    AccountIdNotFound,
-    #[error("local actor must have shared inbox url")]
-    SharedInboxNotFound,
-    #[error(transparent)]
-    Unknown(anyhow::Error),
-}
-
-impl From<RowToLocalActorError> for CreateLocalActorError {
-    fn from(err: RowToLocalActorError) -> Self {
-        match err {
-            RowToLocalActorError::AccountIdNotFound => Self::AccountIdNotFound,
-            RowToLocalActorError::SharedInboxNotFound => Self::SharedInboxNotFound,
-        }
-    }
-}
-
-impl From<CreateActorError> for CreateLocalActorError {
-    fn from(err: CreateActorError) -> Self {
-        match err {
-            CreateActorError::AlreadyExists => Self::AlreadyExists,
-            CreateActorError::Unknown(err) => Self::Unknown(err),
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FindActorError {
-    #[error("actor not found")]
-    NotFound,
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug)]
 pub struct CreateLocalActorRequest {
     pub account_id: AccountId,
-    pub name: AccountName,
 }
 
 #[derive(Debug, Clone)]
@@ -164,20 +92,6 @@ pub struct RemoteActor {
     pub shared_inbox_url: Option<HttpUrl>,
 }
 
-impl From<ActorRow> for RemoteActor {
-    fn from(row: ActorRow) -> Self {
-        Self {
-            id: row.id,
-            actor_type: row.actor_type,
-            name: row.name,
-            actor_url: row.actor_url,
-            inbox_url: row.inbox_url,
-            outbox_url: row.outbox_url,
-            shared_inbox_url: row.shared_inbox_url,
-        }
-    }
-}
-
 impl From<RemoteActor> for ActorRow {
     fn from(actor: RemoteActor) -> Self {
         Self {
@@ -194,42 +108,115 @@ impl From<RemoteActor> for ActorRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateRemoteActorRequest {
-    pub actor_type: ActorType,
-    pub name: String,
-    pub actor_url: HttpUrl,
-    pub inbox_url: HttpUrl,
-    pub outbox_url: HttpUrl,
-    pub shared_inbox_url: Option<HttpUrl>,
+pub enum Actor {
+    Local(LocalActor),
+    Remote(RemoteActor),
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum CreateRemoteActorError {
-    #[error("actor is already exists")]
-    AlreadyExists,
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+impl Actor {
+    pub fn as_local(&self) -> Option<&LocalActor> {
+        match self {
+            Actor::Local(actor) => Some(actor),
+            Actor::Remote(_) => None,
+        }
+    }
+
+    pub fn as_remote(&self) -> Option<&RemoteActor> {
+        match self {
+            Actor::Local(_) => None,
+            Actor::Remote(actor) => Some(actor),
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, Actor::Local(_))
+    }
+
+    pub fn is_remote(&self) -> bool {
+        matches!(self, Actor::Remote(_))
+    }
 }
 
-impl From<CreateActorError> for CreateRemoteActorError {
-    fn from(err: CreateActorError) -> Self {
-        match err {
-            CreateActorError::AlreadyExists => Self::AlreadyExists,
-            CreateActorError::Unknown(err) => Self::Unknown(err),
+impl From<ActorRow> for Actor {
+    fn from(row: ActorRow) -> Self {
+        let ActorRow {
+            id,
+            actor_type,
+            name,
+            actor_url,
+            inbox_url,
+            outbox_url,
+            shared_inbox_url,
+            account_id,
+        } = row;
+
+        match (account_id, shared_inbox_url) {
+            (Some(account_id), Some(shared_inbox_url)) => Actor::Local(LocalActor {
+                id,
+                actor_type,
+                name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+                account_id,
+            }),
+            (_, shared_inbox_url) => Actor::Remote(RemoteActor {
+                id,
+                actor_type,
+                name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+            }),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct FindRemoteActorRequest {
-    pub name: String,
-    pub host: String,
+impl From<Actor> for ActorRow {
+    fn from(actor: Actor) -> Self {
+        match actor {
+            Actor::Local(actor) => ActorRow::from(actor),
+            Actor::Remote(actor) => ActorRow::from(actor),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum FindRemoteActorError {
-    #[error("remote actor not found")]
+pub enum FindActorError {
+    #[error("actor not found")]
     NotFound,
     #[error(transparent)]
-    Unknown(anyhow::Error),
+    DataBaseError(anyhow::Error),
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolveActorRequest {
+    /// actor host name
+    pub host: String,
+    /// actor preferred name
+    pub name: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ResolveActorError {
+    #[error("{0}")]
+    WebFingerError(#[from] WebFingerError),
+    #[error(transparent)]
+    DataBaseError(anyhow::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum WebFingerError {
+    #[error("unexpected status code: {0}")]
+    HttpStatusError(u16),
+    #[error("{0}")]
+    UnexpectedResponse(String),
+    #[error("invalid http signature")]
+    InvalidSignature,
+    #[error("webfinger response is missing self link")]
+    MissingSelfLink,
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
 }

@@ -1,147 +1,190 @@
-use crate::{
-    ap::ActorType,
-    domain::{
-        ap::model::{ActorId, ActorRow},
-        hosturl::HostUrlService,
+use super::{
+    adapter::{ActorRepository, ActorService, WebFingerPort},
+    model::{
+        ActorId, CreateActorError, LocalActor,
+        actor::{Actor, FindActorError, ResolveActorError, ResolveActorRequest},
     },
 };
-
-use super::{
-    adapter::{ActorRepository, ApService, NoteRepository},
-    model::{
-        CreateLocalActorError, CreateLocalActorRequest, CreateRemoteActorError,
-        CreateRemoteActorRequest, LocalActor, RemoteActor,
-        actor::FindRemoteActorRequest,
-        note::{
-            CreateLocalNoteError, CreateLocalNoteRequest, CreateRemoteNoteError,
-            CreateRemoteNoteRequest, LocalNote, NoteId, RemoteNote,
-        },
-    },
+use crate::domain::{
+    HttpUrl,
+    account::{adapter::AccountRepository, model::AccountId},
+    ap::model::ActorRow,
+    hosturl::HostUrlService,
 };
 
 #[derive(Debug, Clone)]
-pub struct Service<AR, NR, H> {
-    actor_repo: AR,
-    note_repo: NR,
-    host_url: H,
+pub struct Service<
+    ActorRepo: ActorRepository,
+    AccountRepo: AccountRepository,
+    WF: WebFingerPort,
+    HS: HostUrlService,
+> {
+    actor_repository: ActorRepo,
+    account_repository: AccountRepo,
+    webfinger: WF,
+    host_url: HS,
 }
 
-impl<AR, NR, H> Service<AR, NR, H>
-where
-    AR: ActorRepository,
-    NR: NoteRepository,
-    H: HostUrlService,
+impl<
+    ActorRepo: ActorRepository,
+    AccountRepo: AccountRepository,
+    WF: WebFingerPort,
+    HS: HostUrlService,
+> Service<ActorRepo, AccountRepo, WF, HS>
 {
-    pub fn new(actor_repo: AR, note_repo: NR, host_url: H) -> Self {
+    pub fn new(
+        actor_repository: ActorRepo,
+        account_repository: AccountRepo,
+        webfinger: WF,
+        host_url: HS,
+    ) -> Self {
         Self {
-            actor_repo,
-            note_repo,
+            actor_repository,
+            account_repository,
+            webfinger,
             host_url,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<AR, NR, H> ApService for Service<AR, NR, H>
-where
-    AR: ActorRepository,
-    NR: NoteRepository,
-    H: HostUrlService,
+impl<
+    ActorRepo: ActorRepository,
+    AccountRepo: AccountRepository,
+    WF: WebFingerPort,
+    HS: HostUrlService,
+> ActorService for Service<ActorRepo, AccountRepo, WF, HS>
 {
+    #[tracing::instrument(skip(self))]
     async fn create_local_actor(
         &self,
-        req: CreateLocalActorRequest,
-    ) -> Result<LocalActor, CreateLocalActorError> {
-        let CreateLocalActorRequest { account_id, name } = req;
-
-        let inbox_url = self.host_url.inbox_url(name.as_str());
-        let outbox_url = self.host_url.outbox_url(name.as_str());
-        let actor_url = self.host_url.actor_url(name.as_str());
-        let shared_inbox_url = self.host_url.shared_inbox_url();
-        let row = ActorRow {
-            id: ActorId::new(),
-            actor_type: ActorType::Person,
-            name: name.as_str().to_string(),
-            inbox_url,
-            outbox_url,
-            actor_url,
-            account_id: account_id.into(),
-            shared_inbox_url: shared_inbox_url.into(),
+        account_id: &AccountId,
+    ) -> Result<LocalActor, CreateActorError> {
+        let account = self.account_repository.find_by_id(account_id).await;
+        let account = match account {
+            Ok(Some(v)) => v,
+            Ok(None) => return Err(CreateActorError::AccountNotExists),
+            Err(e) => return Err(CreateActorError::DataBaseError(e.into())),
         };
-        let actor_row = self.actor_repo.upsert_actor(row).await?;
 
-        let local_actor = LocalActor::try_from(actor_row)?;
+        let local_actor = LocalActor {
+            id: Default::default(),
+            actor_type: crate::ap::ActorType::Person,
+            name: account.name().as_str().to_string(),
+            actor_url: self.host_url.actor_url(account.name().as_str()),
+            inbox_url: self.host_url.inbox_url(account.name().as_str()),
+            outbox_url: self.host_url.outbox_url(account.name().as_str()),
+            shared_inbox_url: self.host_url.shared_inbox_url(),
+            account_id: account.id().clone(),
+        };
 
-        Ok(local_actor)
+        let row = self
+            .actor_repository
+            .create(local_actor.into())
+            .await
+            .unwrap();
+        let any_actor = Actor::from(row);
+        match any_actor {
+            Actor::Local(local_actor) => Ok(local_actor),
+            Actor::Remote(_) => {
+                return Err(CreateActorError::DataBaseError(anyhow::anyhow!(
+                    "expect local actor"
+                )));
+            }
+        }
     }
 
-    async fn create_remote_actor(
-        &self,
-        req: CreateRemoteActorRequest,
-    ) -> Result<RemoteActor, CreateRemoteActorError> {
-        let CreateRemoteActorRequest {
-            actor_type,
-            actor_url,
-            inbox_url,
-            name,
-            outbox_url,
-            shared_inbox_url,
-        } = req;
+    #[tracing::instrument(skip(self))]
+    async fn find_actor_by_id(&self, id: &ActorId) -> Result<Option<Actor>, FindActorError> {
+        let row = self.actor_repository.find_by_id(id).await?;
+        let actor = row.map(Actor::from);
+        Ok(actor)
+    }
 
-        let actor_row = ActorRow {
-            id: ActorId::new(),
-            actor_type,
-            name,
-            inbox_url,
-            outbox_url,
-            actor_url,
+    #[tracing::instrument(skip(self))]
+    async fn resolve_actor_by_url(&self, actor_id: &HttpUrl) -> Result<Actor, ResolveActorError> {
+        let db_actor = self.actor_repository.find_by_url(actor_id).await;
+        match db_actor {
+            Ok(Some(row)) => {
+                tracing::info!(actor_id = %actor_id,"actor found in db");
+                let actor = Actor::from(row);
+                return Ok(actor);
+            }
+            Ok(None) => {
+                tracing::info!(actor_id = %actor_id,"actor not found in db, try to resolve it");
+            }
+            Err(e) => {
+                tracing::error!(actor_id = %actor_id, e = %e, "failed to find actor");
+                return Err(ResolveActorError::DataBaseError(e.into()));
+            }
+        };
+
+        let ap_actor = self.webfinger.lookup_by_id(actor_id).await?;
+        let remote_actor = ActorRow {
+            id: Default::default(),
+            actor_type: ap_actor.kind,
+            name: ap_actor.preferred_username,
+            actor_url: ap_actor.id,
+            inbox_url: ap_actor.inbox,
+            outbox_url: ap_actor.outbox,
+            shared_inbox_url: None,
             account_id: None,
-            shared_inbox_url,
         };
-        let actor_row = self.actor_repo.upsert_actor(actor_row).await?;
-        let remote_actor = RemoteActor::from(actor_row);
-        Ok(remote_actor)
+        let actor_row = self.actor_repository.create(remote_actor).await;
+        let actor_row = match actor_row {
+            Ok(row) => row,
+            Err((_, e)) => {
+                tracing::error!(actor_id = %actor_id, e = %e, "failed to create actor");
+                return Err(ResolveActorError::DataBaseError(e.into()));
+            }
+        };
+        let actor = Actor::from(actor_row);
+        Ok(actor)
     }
 
-    async fn create_local_note(
-        &self,
-        req: CreateLocalNoteRequest,
-    ) -> Result<LocalNote, CreateLocalNoteError> {
-        let actor = self.actor_repo.find_local_actor(&req.account_id).await?;
-
-        let note_id = NoteId::new();
-        let note_url = self.host_url.note_url(&note_id.to_string());
-
-        let note = LocalNote {
-            id: note_id,
-            actor_id: actor.id,
-            account_id: req.account_id,
-            content: req.content,
-            note_url,
+    #[tracing::instrument(skip(self))]
+    async fn resolve_actor(&self, req: &ResolveActorRequest) -> Result<Actor, ResolveActorError> {
+        let db_actor = self
+            .actor_repository
+            .find_by_host_name(req.host.as_str(), req.name.as_str())
+            .await;
+        match db_actor {
+            Ok(Some(row)) => {
+                tracing::info!(actor_id = %req.name, "actor found in db");
+                let actor = Actor::from(row);
+                return Ok(actor);
+            }
+            Ok(None) => {
+                tracing::info!(actor_id = %req.name, "actor not found in db, try to resolve it");
+            }
+            Err(e) => {
+                tracing::error!(actor_id = %req.name, e = %e, "failed to find actor");
+                return Err(ResolveActorError::DataBaseError(e.into()));
+            }
         };
-
-        let note = self.note_repo.create_local_note(note).await?;
-        Ok(note)
-    }
-
-    async fn create_remote_note(
-        &self,
-        req: CreateRemoteNoteRequest,
-    ) -> Result<RemoteNote, CreateRemoteNoteError> {
-        let remote_actor_req = FindRemoteActorRequest {
-            name: req.name,
-            host: req.host,
+        let ap_actor = self
+            .webfinger
+            .lookup_by_host_name(req.host.as_str(), req.name.as_str())
+            .await?;
+        let remote_actor = ActorRow {
+            id: Default::default(),
+            actor_type: ap_actor.kind,
+            name: ap_actor.preferred_username,
+            actor_url: ap_actor.id,
+            inbox_url: ap_actor.inbox,
+            outbox_url: ap_actor.outbox,
+            shared_inbox_url: None,
+            account_id: None,
         };
-        let actor = self.actor_repo.find_remote_actor(&remote_actor_req).await?;
-        let note_id = NoteId::new();
-
-        let remote_note = RemoteNote {
-            id: note_id,
-            actor_id: actor.id,
-            content: req.content,
-            note_url: req.note_url,
+        let actor_row = self.actor_repository.create(remote_actor).await;
+        let actor_row = match actor_row {
+            Ok(row) => row,
+            Err((_, e)) => {
+                tracing::error!(actor_id = %req.name, e = %e, "failed to create actor");
+                return Err(ResolveActorError::DataBaseError(e.into()));
+            }
         };
-        let note = self.note_repo.create_remote_note(remote_note).await?;
-        Ok(note)
+        let actor = Actor::from(actor_row);
+        Ok(actor)
     }
 }
