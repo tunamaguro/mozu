@@ -188,6 +188,8 @@ pub enum FindActorError {
     #[error("actor not found")]
     NotFound,
     #[error(transparent)]
+    InvalidData(anyhow::Error),
+    #[error(transparent)]
     DataBaseError(anyhow::Error),
 }
 

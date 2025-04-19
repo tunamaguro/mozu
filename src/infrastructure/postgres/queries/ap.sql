@@ -1,30 +1,4 @@
--- name: GetAccountActor :one
-SELECT
-    id,
-    type,
-    name,
-    host,
-    actor_url,
-    inbox_url,
-    outbox_url,
-    shared_inbox_url
-FROM actors
-WHERE account_id = $1;
-
--- name: GetActorByNameAndHost :one
-SELECT
-    id,
-    type,
-    name,
-    host,
-    actor_url,
-    inbox_url,
-    outbox_url,
-    shared_inbox_url
-FROM actors
-WHERE name = $1 AND host = $2;
-
--- name: UpsertActor :one
+-- name: CreateActor :exec
 INSERT INTO actors (
     id,
     type,
@@ -36,53 +10,71 @@ INSERT INTO actors (
     shared_inbox_url,
     account_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-ON CONFLICT (name, host) DO UPDATE
-SET
-type = excluded.type,
-actor_url = excluded.actor_url,
-inbox_url = excluded.inbox_url,
-outbox_url = excluded.outbox_url,
-shared_inbox_url = excluded.shared_inbox_url,
-account_id = excluded.account_id
-RETURNING id;
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+);
 
--- name: InsertAccountKey :exec
-INSERT INTO account_keys (
-    account_id,
-    key_type,
-    public_key,
-    private_key
-)
-VALUES ($1, $2, $3, $4);
 
--- name: GetAccountKeys :many
+-- name: GetActor :one
 SELECT
-    key_type,
-    public_key,
-    private_key
-FROM account_keys
-WHERE account_id = $1;
+    actors.id,
+    actors.type,
+    actors.name,
+    actors.host,
+    actors.actor_url,
+    actors.inbox_url,
+    actors.outbox_url,
+    actors.shared_inbox_url,
+    actors.account_id
+FROM actors
+WHERE actors.id = $1;
 
--- name: InsertNoteSource :one
-INSERT INTO note_sources (
-    id,
-    account_id,
-    content
-) VALUES ($1, $2, $3)
-RETURNING id;
+-- name: GetActorByActorUrl :one
+SELECT
+    actors.id,
+    actors.type,
+    actors.name,
+    actors.host,
+    actors.actor_url,
+    actors.inbox_url,
+    actors.outbox_url,
+    actors.shared_inbox_url,
+    actors.account_id
+FROM actors
+WHERE actors.actor_url = $1;
 
--- name: InsertNote :exec
-INSERT INTO notes (
-    id,
-    actor_id,
-    source_id,
-    content,
-    note_url
-) VALUES ($1, $2, $3, $4, $5);
+-- name: GetActorByNameAndHost :one
+SELECT
+    actors.id,
+    actors.type,
+    actors.name,
+    actors.host,
+    actors.actor_url,
+    actors.inbox_url,
+    actors.outbox_url,
+    actors.shared_inbox_url,
+    actors.account_id
+FROM actors
+WHERE actors.name = $1 AND actors.host = $2;
 
--- name: CreateFollow :exec
-INSERT INTO follows (
-    follower_id,
-    followee_id
-) VALUES ($1, $2);
+-- name: GetActorByAccountId :one
+SELECT
+    actors.id,
+    actors.type,
+    actors.name,
+    actors.host,
+    actors.actor_url,
+    actors.inbox_url,
+    actors.outbox_url,
+    actors.shared_inbox_url,
+    actors.account_id
+FROM actors
+WHERE actors.account_id = $1;

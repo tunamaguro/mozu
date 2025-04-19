@@ -1,4 +1,5 @@
 mod queries;
+use anyhow::Context as _;
 use std::str::FromStr;
 
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod, Transaction};
@@ -58,10 +59,7 @@ impl Postgres {
         self.pool
             .get()
             .await
-            .map_err(|e| anyhow::anyhow!(e))
-            .inspect_err(|e| {
-                tracing::error!(error = %e, "Failed to get client from pool");
-            })
+            .context("failed to get client from pool")
     }
 }
 
@@ -126,6 +124,288 @@ mod account_repository_impl {
                 Ok(Some(Account::from_id_name(id, name)))
             } else {
                 return Ok(None);
+            }
+        }
+    }
+}
+
+mod actor_repository_impl {
+    use crate::{
+        ap::ActorType,
+        domain::{
+            HttpUrl, HttpUrlError,
+            account::model::AccountId,
+            ap::{
+                adapter::ActorRepository,
+                model::{ActorId, ActorRow, CreateActorError, actor::FindActorError},
+            },
+        },
+    };
+
+    use super::*;
+
+    impl From<ActorType> for queries::ActorType {
+        fn from(actor_type: ActorType) -> Self {
+            match actor_type {
+                ActorType::Person => queries::ActorType::Person,
+                ActorType::Application => queries::ActorType::Application,
+                ActorType::Service => queries::ActorType::Service,
+                ActorType::Group => queries::ActorType::Group,
+                ActorType::Organization => queries::ActorType::Organization,
+            }
+        }
+    }
+
+    impl From<queries::ActorType> for ActorType {
+        fn from(actor_type: queries::ActorType) -> Self {
+            match actor_type {
+                queries::ActorType::Person => ActorType::Person,
+                queries::ActorType::Application => ActorType::Application,
+                queries::ActorType::Service => ActorType::Service,
+                queries::ActorType::Group => ActorType::Group,
+                queries::ActorType::Organization => ActorType::Organization,
+            }
+        }
+    }
+
+    impl From<deadpool_postgres::tokio_postgres::Error> for FindActorError {
+        fn from(e: deadpool_postgres::tokio_postgres::Error) -> Self {
+            tracing::error!(error = %e, "Failed to find actor");
+            Self::DataBaseError(e.into())
+        }
+    }
+
+    impl From<HttpUrlError> for FindActorError {
+        fn from(e: HttpUrlError) -> Self {
+            Self::InvalidData(anyhow::anyhow!(e).context("expected valid url"))
+        }
+    }
+
+    impl TryFrom<queries::GetActorRow> for ActorRow {
+        type Error = FindActorError;
+        fn try_from(row: queries::GetActorRow) -> Result<Self, Self::Error> {
+            let id = row.actors_id.into();
+            let actor_type = row.actors_type.into();
+            let actor_url = HttpUrl::from_str(&row.actors_actor_url)?;
+            let inbox_url = HttpUrl::from_str(&row.actors_inbox_url)?;
+            let outbox_url = HttpUrl::from_str(&row.actors_outbox_url)?;
+            let shared_inbox_url = row
+                .actors_shared_inbox_url
+                .map(|url| HttpUrl::from_str(&url))
+                .transpose()?;
+
+            let account_id = row.actors_account_id.map(|id| id.into());
+
+            Ok(Self {
+                id,
+                actor_type,
+                name: row.actors_name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+                account_id,
+            })
+        }
+    }
+
+    impl TryFrom<queries::GetActorByActorUrlRow> for ActorRow {
+        type Error = FindActorError;
+        fn try_from(row: queries::GetActorByActorUrlRow) -> Result<Self, Self::Error> {
+            let id = row.actors_id.into();
+            let actor_type = row.actors_type.into();
+            let actor_url = HttpUrl::from_str(&row.actors_actor_url)?;
+            let inbox_url = HttpUrl::from_str(&row.actors_inbox_url)?;
+            let outbox_url = HttpUrl::from_str(&row.actors_outbox_url)?;
+            let shared_inbox_url = row
+                .actors_shared_inbox_url
+                .map(|url| HttpUrl::from_str(&url))
+                .transpose()?;
+
+            let account_id = row.actors_account_id.map(|id| id.into());
+
+            Ok(Self {
+                id,
+                actor_type,
+                name: row.actors_name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+                account_id,
+            })
+        }
+    }
+
+    impl TryFrom<queries::GetActorByNameAndHostRow> for ActorRow {
+        type Error = FindActorError;
+        fn try_from(row: queries::GetActorByNameAndHostRow) -> Result<Self, Self::Error> {
+            let id = row.actors_id.into();
+            let actor_type = row.actors_type.into();
+            let actor_url = HttpUrl::from_str(&row.actors_actor_url)?;
+            let inbox_url = HttpUrl::from_str(&row.actors_inbox_url)?;
+            let outbox_url = HttpUrl::from_str(&row.actors_outbox_url)?;
+            let shared_inbox_url = row
+                .actors_shared_inbox_url
+                .map(|url| HttpUrl::from_str(&url))
+                .transpose()?;
+
+            let account_id = row.actors_account_id.map(|id| id.into());
+
+            Ok(Self {
+                id,
+                actor_type,
+                name: row.actors_name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+                account_id,
+            })
+        }
+    }
+
+    impl TryFrom<queries::GetActorByAccountIdRow> for ActorRow {
+        type Error = FindActorError;
+        fn try_from(row: queries::GetActorByAccountIdRow) -> Result<Self, Self::Error> {
+            let id = row.actors_id.into();
+            let actor_type = row.actors_type.into();
+            let actor_url = HttpUrl::from_str(&row.actors_actor_url)?;
+            let inbox_url = HttpUrl::from_str(&row.actors_inbox_url)?;
+            let outbox_url = HttpUrl::from_str(&row.actors_outbox_url)?;
+            let shared_inbox_url = row
+                .actors_shared_inbox_url
+                .map(|url| HttpUrl::from_str(&url))
+                .transpose()?;
+            let account_id =
+                row.actors_account_id
+                    .ok_or(FindActorError::InvalidData(anyhow::anyhow!(
+                        "expected account id"
+                    )))?;
+
+            Ok(Self {
+                id,
+                actor_type,
+                name: row.actors_name,
+                actor_url,
+                inbox_url,
+                outbox_url,
+                shared_inbox_url,
+                account_id: Some(account_id.into()),
+            })
+        }
+    }
+
+    impl ActorRepository for Postgres {
+        async fn create(&self, actor: ActorRow) -> Result<ActorRow, (ActorRow, CreateActorError)> {
+            let client = self.get_client().await;
+            let client = match client {
+                Ok(client) => client,
+                Err(e) => {
+                    return Err((actor, CreateActorError::DataBaseError(e)));
+                }
+            };
+
+            let actor_type = queries::ActorType::from(actor.actor_type);
+            let shared_inbox_url = actor.shared_inbox_url.as_ref().map(|url| url.as_str());
+            let account_id = actor.account_id.as_ref().map(|id| id.as_ref());
+
+            let res = queries::create_actor(
+                &client,
+                &actor.id,
+                &actor_type,
+                &actor.name,
+                actor.host(),
+                actor.actor_url.as_str(),
+                actor.inbox_url.as_str(),
+                actor.outbox_url.as_str(),
+                shared_inbox_url,
+                account_id,
+            )
+            .await;
+
+            match res {
+                Ok(_) => Ok(actor),
+
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to create actor");
+                    Err((
+                        actor,
+                        CreateActorError::DataBaseError(
+                            anyhow::Error::from(e).context("insert failed"),
+                        ),
+                    ))
+                }
+            }
+        }
+        async fn find_by_id(&self, id: &ActorId) -> Result<Option<ActorRow>, FindActorError> {
+            let client = self
+                .get_client()
+                .await
+                .map_err(FindActorError::DataBaseError)?;
+            let get_actor_row = queries::get_actor(&client, id).await?;
+
+            match get_actor_row {
+                Some(row) => {
+                    let actor_row = ActorRow::try_from(row)?;
+                    Ok(Some(actor_row))
+                }
+                None => Ok(None),
+            }
+        }
+        async fn find_by_url(&self, url: &HttpUrl) -> Result<Option<ActorRow>, FindActorError> {
+            let client = self
+                .get_client()
+                .await
+                .map_err(FindActorError::DataBaseError)?;
+
+            let row = queries::get_actor_by_actor_url(&client, url.as_str()).await?;
+
+            match row {
+                Some(row) => {
+                    let actor_row = ActorRow::try_from(row)?;
+                    Ok(Some(actor_row))
+                }
+                None => Ok(None),
+            }
+        }
+        async fn find_by_host_name(
+            &self,
+            host: &str,
+            name: &str,
+        ) -> Result<Option<ActorRow>, FindActorError> {
+            let client = self
+                .get_client()
+                .await
+                .map_err(FindActorError::DataBaseError)?;
+
+            let row = queries::get_actor_by_name_and_host(&client, host, name).await?;
+
+            match row {
+                Some(row) => {
+                    let actor_row = ActorRow::try_from(row)?;
+                    Ok(Some(actor_row))
+                }
+                None => Ok(None),
+            }
+        }
+        async fn find_by_account_id(
+            &self,
+            account_id: &AccountId,
+        ) -> Result<Option<ActorRow>, FindActorError> {
+            let client = self
+                .get_client()
+                .await
+                .map_err(FindActorError::DataBaseError)?;
+
+            let row = queries::get_actor_by_account_id(&client, Some(account_id)).await?;
+
+            match row {
+                Some(row) => {
+                    let actor_row = ActorRow::try_from(row)?;
+                    Ok(Some(actor_row))
+                }
+                None => Ok(None),
             }
         }
     }

@@ -4,16 +4,16 @@ use crate::domain::{HttpUrl, hosturl::HostUrlService};
 use anyhow::Context;
 use reqwest::header;
 
-pub struct WebFingerResolver<HS> {
-    host_url: HS,
+#[derive(Debug, Clone)]
+pub struct WebFingerResolver {
     client: reqwest::Client,
 }
 
-impl<HS> WebFingerResolver<HS>
-where
-    HS: HostUrlService,
-{
-    pub fn new(hs: HS) -> Self {
+impl WebFingerResolver {
+    pub fn new<HS>(hs: HS) -> Self
+    where
+        HS: HostUrlService,
+    {
         const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
         let mut headers = header::HeaderMap::new();
         headers.insert(
@@ -30,17 +30,11 @@ where
             .build()
             .expect("Failed to create reqwest client");
 
-        Self {
-            client,
-            host_url: hs,
-        }
+        Self { client }
     }
 }
 
-impl<HS> WebFingerPort for WebFingerResolver<HS>
-where
-    HS: HostUrlService,
-{
+impl WebFingerPort for WebFingerResolver {
     #[tracing::instrument(skip(self))]
     async fn lookup_by_id(&self, actor_id: &HttpUrl) -> Result<crate::ap::Actor, WebFingerError> {
         let request = self

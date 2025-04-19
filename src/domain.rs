@@ -6,7 +6,7 @@ use std::{ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id<T> {
     inner: uuid::Uuid,
     _marker: std::marker::PhantomData<T>,
@@ -38,6 +38,12 @@ impl<T> Deref for Id<T> {
     type Target = uuid::Uuid;
 
     fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> AsRef<uuid::Uuid> for Id<T> {
+    fn as_ref(&self) -> &uuid::Uuid {
         &self.inner
     }
 }
